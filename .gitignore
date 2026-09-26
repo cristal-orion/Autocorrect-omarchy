@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+build/
+# User configuration backups must stay outside the repository.
+backups/
+*.egg-info/
+dist/
+benchmark-results/
+benchmark-data/

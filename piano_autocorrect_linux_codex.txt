@@ -1,0 +1,148 @@
+PROGETTO: AUTOCORRECT LINUX “MOBILE-STYLE”
+
+SINOSSI
+Vogliamo creare per Linux un correttore automatico rapido e discreto, simile a quello delle tastiere Android: mentre si scrive con una tastiera fisica, i typo evidenti vengono corretti automaticamente senza popup, click o interruzioni del flusso.
+
+Esempio:
+“quesot progetto” -> “questo progetto”
+
+L’obiettivo non è creare un nuovo Grammarly, ma un vero layer di autocorrect system-wide, con latenza molto bassa e comportamento conservativo: correggere automaticamente solo quando la confidenza è molto alta.
+
+AMBIENTE
+- Macchina di test dedicata con Omarchy.
+- Codex già installato.
+- Stack Wayland / Hyprland.
+- Fcitx 5 già disponibile nell’ambiente.
+- Usare Git per tutto il progetto.
+- Prima di modifiche importanti al sistema, creare uno snapshot Omarchy.
+
+
+IDEA TECNICA
+Usare come base il motore di autocorrezione/suggerimenti di AOSP LatinIME, evitando di ricostruire da zero anni di logica già sviluppata per Android.
+
+La priorità è riutilizzare il core con licenza permissiva di AOSP, non portare l’intera tastiera Android.
+
+Architettura desiderata:
+
+tastiera fisica
+    ->
+Fcitx 5
+    ->
+autocorrect-core
+    ->
+testo corretto
+    ->
+applicazione
+
+Il progetto dovrebbe restare diviso in almeno due parti:
+
+1. autocorrect-core
+   Motore indipendente dalla distribuzione e da Fcitx.
+   Riceve parola + eventuale contesto e restituisce candidati/correzione con uno score/confidence.
+
+2. fcitx5-autocorrect
+   Sottile layer di integrazione con Fcitx 5 che usa il core per correggere durante la digitazione.
+
+FASE 1 — PROTOTIPO STANDALONE
+NON modificare ancora Fcitx o il sistema di input.
+
+Studiare AOSP LatinIME e identificare il sottoinsieme minimo riutilizzabile per Linux.
+
+Obiettivo iniziale:
+un programma CLI tipo:
+
+./autocorrect "quesot"
+
+che restituisca qualcosa come:
+
+questo    0.99
+quesito   0.30
+
+Rimuovere o sostituire le dipendenze Android/JNI non necessarie.
+
+Partire dall’italiano.
+
+FASE 2 — BENCHMARK
+Creare un piccolo dataset di typo italiani realistici, ad esempio:
+
+quesot -> questo
+proggeto -> progetto
+domnai -> domani
+qaundo -> quando
+interesasnte -> interessante
+
+Includere errori tipici da tastiera fisica:
+- inversione di lettere
+- lettera mancante
+- lettera in più
+- doppie errate
+- tasto vicino
+- errori di battitura frequenti
+
+Misurare soprattutto la precisione delle correzioni automatiche.
+
+Principio:
+meglio correggere meno parole ma sbagliare quasi mai.
+
+La soglia per l’autocorrect deve essere molto conservativa.
+
+FASE 3 — ADATTAMENTO ALLA TASTIERA FISICA
+LatinIME nasce per touchscreen, quindi adattare la logica di proximity alla tastiera fisica.
+
+Creare una semplice mappa di vicinanza per QWERTY, inizialmente quella usata sulla macchina di test.
+
+Esempio:
+r e t sono vicini
+s d f sono vicini
+
+Non serve replicare la geometria touch di Android se una matrice di prossimità più semplice funziona bene.
+
+FASE 4 — INTEGRAZIONE FCITX 5
+Solo quando il motore standalone è stabile e il benchmark è soddisfacente, integrare il core con Fcitx 5.
+
+Comportamento desiderato:
+- digitazione normale
+- quando viene premuto spazio, valutare la parola appena scritta
+- se la confidence supera la soglia, fare autocorrect e continuare
+- se la confidence è bassa, lasciare il testo invariato
+- latenza non percepibile
+
+Funzione importante:
+Backspace immediatamente dopo una correzione dovrebbe poter annullare la correzione e ripristinare la parola originale.
+
+Evitare autocorrect dove non è appropriato, in particolare:
+- terminale
+- password
+- URL
+- email
+- codice
+quando possibile tramite contesto/input hints o configurazione.
+
+FASE 5 — TEST REALI
+Testare l’input method su applicazioni diverse, ad esempio:
+- browser
+- editor di testo
+- ChatGPT
+- LibreOffice
+- VS Code / editor di codice
+- app Electron
+- terminale con autocorrect disabilitato
+
+Verificare stabilità, latenza e facilità di disattivazione.
+
+SICUREZZA / ROLLBACK
+- Git per il codice.
+- Snapshot Omarchy prima di modifiche importanti a pacchetti, Fcitx o configurazioni di sistema.
+- Fare backup delle configurazioni utente coinvolte, specialmente ~/.config/fcitx5.
+- Non rimuovere mai l’input method standard: il nostro autocorrect deve essere aggiuntivo e facilmente disattivabile.
+- Preparare, quando si passa alla fase di integrazione:
+  - install script
+  - disable script
+  - uninstall script
+
+OBIETTIVO FINALE
+Arrivare a un input method Linux usabile quotidianamente che dia un’esperienza simile all’autocorrect Android:
+
+scrivo male -> premo spazio -> la parola corretta appare automaticamente -> continuo a scrivere.
+
+

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autocorrect-omarchy"
+version = "0.1.0"
+description = "Conservative Italian autocorrect prototype, independent of Fcitx"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["symspellpy==6.10.0"]
+
+[project.scripts]
+autocorrect = "autocorrect_core.cli:main"
+autocorrect-fetch-dictionary = "autocorrect_core.dictionary:main"
+autocorrect-benchmark = "autocorrect_core.benchmark:main"
+autocorrect-generate-typos = "autocorrect_core.generate_typos:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+autocorrect_core = ["protected.txt"]
