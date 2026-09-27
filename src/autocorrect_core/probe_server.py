@@ -1,7 +1,7 @@
 """Persistent local engine for the isolated Fcitx probe, one token per packet."""
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 import os
 from pathlib import Path
@@ -36,7 +36,27 @@ def decide(engine, request: bytes) -> dict:
             "required_margin": engine.policy.min_score_margin}
 
 
-def serve(engine, path: Path, ready: Path, diagnostics: Path | None = None):
+def refresh_policy(engine, settings: Path | None) -> bool:
+    """Apply a session-local override; malformed writes retain the last policy."""
+    if settings is None:
+        return False
+    try:
+        with settings.open("rb") as source:
+            raw = source.read(1025)
+        if len(raw) > 1024:
+            return False
+        payload = json.loads(raw)
+        value = payload.get("min_score_margin") if isinstance(payload, dict) else None
+        if type(value) not in (int, float) or not 0.01 <= value <= 5.0:
+            return False
+        engine.policy = replace(engine.policy, min_score_margin=float(value))
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def serve(engine, path: Path, ready: Path, diagnostics: Path | None = None,
+          settings: Path | None = None):
     if len(os.fsencode(path)) >= 108:
         raise ValueError("Percorso del socket troppo lungo.")
     # Refuse to overwrite a socket from another running session.
@@ -71,6 +91,7 @@ def serve(engine, path: Path, ready: Path, diagnostics: Path | None = None):
                         packet, _, flags, _ = client.recvmsg(PACKET_LIMIT)
                         if flags & socket.MSG_TRUNC:
                             raise ValueError("Pacchetto troppo grande.")
+                        refresh_policy(engine, settings)
                         response = decide(engine, packet)
                     except (ValueError, OSError):
                         response = {"action": "keep", "reason": "invalid_request"}
@@ -98,11 +119,12 @@ def main(argv=None):
     parser.add_argument("--socket", type=Path, required=True)
     parser.add_argument("--ready", type=Path, required=True)
     parser.add_argument("--diagnostics", type=Path, help="Ultima analisi locale per la finestra di prova")
+    parser.add_argument("--settings", type=Path, help="Margine modificabile, solo per questa sessione di prova")
     add_engine_arguments(parser)
     args = parser.parse_args(argv)
     try:
         engine = load_engine(args)
-        serve(engine, args.socket, args.ready, args.diagnostics)
+        serve(engine, args.socket, args.ready, args.diagnostics, args.settings)
     except (OSError, ValueError) as error:
         parser.exit(2, f"Errore: {error}\n")
     return 0

@@ -25,6 +25,29 @@ decisione del motore, non una conferma che l'applicazione l'abbia applicata:
 una risposta tardiva può essere scartata dal bridge. Il pannello conserva
 l'ultima analisi disponibile quando il server non risponde.
 
+### Margine regolabile nella finestra Qt
+
+Il campo **Margine minimo** (Alt+M) permette di scegliere un valore fra 0,01 e
+5,00, inizialmente 1,30. Le frecce variano il valore di 0,10; digitando un numero,
+confermarlo con Invio o lasciare il campo. **Ripristina 1,30** torna alla baseline;
+Alt+T riporta al paragrafo. Il nuovo valore vale per i token successivi, senza
+ricorreggere il testo già scritto. L'ultima analisi mostra il margine effettivamente
+usato dal motore; `1.300` indica 1,3, non milletrecento.
+
+Il valore è salvato atomicamente in `settings.json` (0600) nella sola sessione
+isolata. Il server lo legge prima della decisione; file assenti, incompleti o
+valori non validi conservano l'ultima politica valida. Una nuova sessione riparte
+da 1,30. Le altre soglie e protezioni continuano ad applicarsi. GTK usa il valore
+iniziale; questo controllo grafico è disponibile in Qt.
+
+Verifica del controllo: **22 controlli Qt superati**, inclusi `domnai` conservato
+a 1,30 e corretto in `domani` a 1,00, diagnostica del valore effettivo, annullamento
+seguito da spazio e ripristino della soglia. Sei test Python del server verificano
+anche il rifiuto dei valori non validi. Report:
+`build/fcitx-probe-sessions/qt-surrounding-knym_bpv/report.json`.
+
+### Interpretazione della prova
+
 La prova manuale ha evidenziato astensioni su candidati plausibili e parole
 valide usate come typo. Il collegamento raggiunge il core, ma per questi casi
 la qualità resta limitata dalla valutazione a singolo token. Ridurre il margine

@@ -157,6 +157,38 @@ def exercise(app, status_path, client, env, mode, popup=False, core=None):
         diagnostic = wait_for(lambda: (value if "edit_distance" in (value := status(status_path, client)["decision"]["text"])
                                       and "proggeto" in value else None))
         results.append({"test": "diagnostics_explain_abstention", "passed": True, "text": diagnostic})
+        clear()
+        text("domnai ")
+        check("default_margin_abstains", "paragraph", "domnai ")
+        key("m", "ALT")
+        wait_for(lambda: status(status_path, client)["margin"]["focus"])
+        for _ in range(3):
+            key("Down")
+        key("Return")
+        wait_for(lambda: status(status_path, client)["margin"]["value"] == 1.0)
+        key("t", "ALT")
+        wait_for(lambda: status(status_path, client)["paragraph"]["focus"])
+        clear()
+        text("domnai ")
+        check("live_lower_margin_corrects", "paragraph", "domani ")
+        diagnostic = wait_for(lambda: (value if "richiesto: 1.000" in (value := status(status_path, client)["decision"]["text"])
+                                      and "high_margin" in value else None))
+        results.append({"test": "diagnostics_confirm_live_margin", "passed": True, "text": diagnostic})
+        key("BackSpace")
+        key("space")
+        check("live_margin_undo_then_space", "paragraph", "domnai ")
+        key("m", "ALT")
+        wait_for(lambda: status(status_path, client)["margin"]["focus"])
+        for _ in range(3):
+            key("Up")
+        key("Return")
+        key("t", "ALT")
+        wait_for(lambda: status(status_path, client)["paragraph"]["focus"])
+        clear()
+        text("domnai ")
+        check("restored_margin_abstains", "paragraph", "domnai ")
+        clear()
+        text("proggeto ")
         core.send_signal(signal.SIGSTOP)
         try:
             text("quesot ")
@@ -241,14 +273,19 @@ def main():
             socket_path = session / "runtime/e.sock"
             ready = session / "core-ready.json"
             diagnostics = session / "decision.json"
+            settings = session / "settings.json"
+            settings.write_text(json.dumps({"min_score_margin": 1.3}))
+            settings.chmod(0o600)
             with (session / "core.log").open("w") as log:
                 core = subprocess.Popen([str(ROOT / ".venv/bin/python"), "-B", "-m", "autocorrect_core.probe_server",
-                    "--socket", str(socket_path), "--ready", str(ready), "--diagnostics", str(diagnostics), "--hunspell"],
+                    "--socket", str(socket_path), "--ready", str(ready), "--diagnostics", str(diagnostics),
+                    "--settings", str(settings), "--hunspell"],
                     cwd=ROOT, stdout=log, stderr=log)
             children.append(core)
             wait_for(lambda: ready.exists() and json.loads(ready.read_text()), timeout=25)
             env["AUTOCORRECT_PROBE_ENGINE_SOCKET"] = str(socket_path)
             env["AUTOCORRECT_PROBE_DIAGNOSTICS"] = str(diagnostics)
+            env["AUTOCORRECT_PROBE_SETTINGS"] = str(settings)
             print("Motore reale caricato: SymSpell + Hunspell.", flush=True)
         bus = subprocess.Popen(["dbus-daemon", "--session", "--nofork", "--print-address=1"],
                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)

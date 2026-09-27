@@ -1,6 +1,8 @@
 // Dedicated Qt fields for exercising the actual Fcitx input-method module.
 #include <QApplication>
+#include <QDoubleSpinBox>
 #include <QFile>
+#include <QHBoxLayout>
 #include <QInputMethodEvent>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -9,6 +11,8 @@
 #include <QLineEdit>
 #include <QMap>
 #include <QPlainTextEdit>
+#include <QPushButton>
+#include <QSaveFile>
 #include <QTextEdit>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -59,6 +63,9 @@ int main(int argc, char **argv) {
         paragraph->setPlainText(initialText);
         paragraph->moveCursor(QTextCursor::End);
     }
+    auto *paragraphLabel = new QLabel("&Testo multilinea (Alt+T):");
+    paragraphLabel->setBuddy(paragraph);
+    layout->addWidget(paragraphLabel);
     layout->addWidget(paragraph);
     auto *decisionLabel = new QLabel("Ultima analisi del motore: in attesa di una parola seguita da spazio.");
     decisionLabel->setTextFormat(Qt::PlainText);
@@ -68,6 +75,43 @@ int main(int argc, char **argv) {
     else decisionLabel->setParent(&window);
     decisionLabel->setVisible(realEngine);
     const auto diagnosticsPath = qEnvironmentVariable("AUTOCORRECT_PROBE_DIAGNOSTICS");
+    const auto settingsPath = qEnvironmentVariable("AUTOCORRECT_PROBE_SETTINGS");
+    auto *margin = new QDoubleSpinBox(&window);
+    margin->setRange(0.01, 5.0);
+    margin->setDecimals(2);
+    margin->setSingleStep(0.1);
+    margin->setValue(1.3);
+    margin->setKeyboardTracking(false);
+    margin->setInputMethodHints(Qt::ImhNoPredictiveText);
+    auto *marginLabel = new QLabel("&Margine minimo (Alt+M):", &window);
+    marginLabel->setBuddy(margin);
+    auto *resetMargin = new QPushButton("Ripristina 1,30", &window);
+    auto *marginStatus = new QLabel("Vale dalla prossima parola; più basso = più sostituzioni. Solo questa sessione.", &window);
+    marginStatus->setWordWrap(true);
+    if (realEngine && !settingsPath.isEmpty()) {
+        auto *controls = new QHBoxLayout;
+        controls->addWidget(marginLabel);
+        controls->addWidget(margin);
+        controls->addWidget(resetMargin);
+        layout->addLayout(controls);
+        layout->addWidget(marginStatus);
+        QObject::connect(margin, &QDoubleSpinBox::valueChanged, [&](double value) {
+            QSaveFile file(settingsPath);
+            const auto bytes = QJsonDocument(QJsonObject{{"min_score_margin", value}}).toJson();
+            const bool saved = file.open(QIODevice::WriteOnly)
+                && file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)
+                && file.write(bytes) == bytes.size() && file.commit();
+            marginStatus->setText(saved
+                ? "Salvato per i prossimi token. Il margine effettivo compare nell'ultima analisi."
+                : "Errore di salvataggio: il motore conserva il margine precedente.");
+        });
+        QObject::connect(resetMargin, &QPushButton::clicked, [=] { margin->setValue(1.3); });
+    } else {
+        margin->hide();
+        marginLabel->hide();
+        resetMargin->hide();
+        marginStatus->hide();
+    }
     const QMap<QString, QString> explanations{
         {"ambiguous", "Margine insufficiente fra i candidati: conserva l'originale"},
         {"known_word", "Voce presente nella lista di frequenze"},
@@ -130,6 +174,8 @@ int main(int argc, char **argv) {
         object["paragraph"] = QJsonObject{{"text", paragraph->toPlainText()},
             {"cursor", paragraph->textCursor().position()}, {"focus", paragraph->hasFocus()}};
         object["decision"] = QJsonObject{{"text", decisionLabel->text()}};
+        object["margin"] = QJsonObject{{"value", margin->value()}, {"focus", margin->hasFocus()},
+            {"text", marginStatus->text()}};
         QFile file(status);
         if (file.open(QIODevice::WriteOnly)) file.write(QJsonDocument(object).toJson());
     });
