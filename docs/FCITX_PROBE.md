@@ -11,11 +11,25 @@ bash scripts/build-fcitx-probe.sh
 python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core
 ```
 
-La nuova finestra si chiama **Autocorrect - testo reale (SymSpell + Hunspell)**
+La nuova finestra si chiama **Autocorrect - testo reale e diagnostica**
 e apre il focus su un campo multilinea. Scrivere un paragrafo nel campo grande:
 ogni spazio valuta il token precedente. Backspace subito dopo una sostituzione
 ripristina l'originale. Il motore conserva parole note, parole Hunspell, maiuscole
 e casi che non superano le soglie del core.
+
+Sotto il paragrafo compare l'ultima analisi del motore: token, output proposto,
+motivo, primi tre candidati e margine rispetto alla soglia. `ambiguous` significa
+che il margine non basta; `known_word` indica una voce della lista di frequenze;
+`valid_word` indica il riconoscimento Hunspell. La diagnostica riporta una
+decisione del motore, non una conferma che l'applicazione l'abbia applicata:
+una risposta tardiva può essere scartata dal bridge. Il pannello conserva
+l'ultima analisi disponibile quando il server non risponde.
+
+La prova manuale ha evidenziato astensioni su candidati plausibili e parole
+valide usate come typo. Il collegamento raggiunge il core, ma per questi casi
+la qualità resta limitata dalla valutazione a singolo token. Ridurre il margine
+può selezionare una forma grammaticalmente sbagliata per la frase. I test di
+integrazione verificano il meccanismo, non la qualità nell'uso quotidiano.
 
 Esempio di input costruito per provare il percorso, premendo spazio dopo il punto:
 
@@ -38,8 +52,11 @@ Il server Python carica il motore una volta. L'addon C++ gli invia il token
 tramite un socket Unix privato, con messaggi separati per richiesta. Il client
 assegna un budget di 50 ms all'attesa sul socket; errori, risposte non coerenti
 o assenza del server lasciano passare lo spazio con il testo originale. Il
-server non registra i token e non apprende. I file di stato della finestra
-contengono il testo della prova, sotto la cartella di sessione ignorata da Git.
+server non apprende. Il launcher abilita un file locale `decision.json` con
+l'ultima analisi per il pannello; il server lo pubblica dopo aver risposto sul
+socket. Il file ha permessi `0600` e sostituisce l'analisi precedente. I file di
+stato della finestra contengono il testo della prova, sotto la cartella di
+sessione ignorata da Git. I log testuali del server non contengono i token.
 
 Il bridge gestisce una sequenza finale di `,.!?;:` dopo un token alfabetico,
 conservandola nella sostituzione. Tratta URL, percorsi e stringhe strutturate
@@ -61,10 +78,15 @@ python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core -
 python scripts/run-fcitx-probe.py --client gtk --mode surrounding --engine core --test
 ```
 
-Risultati: **16 controlli Qt e 9 GTK superati**. Ai nove casi base, Qt aggiunge
+Risultati iniziali: **16 controlli Qt e 9 GTK superati**. Ai nove casi base, Qt aggiunge
 paragrafo multilinea, correzione e annullamento dell'ultima parola, astensione
 su due modifiche, motore sospeso con SIGSTOP, ripresa senza risposte obsolete
 e arresto del motore. I controlli Python coprono protocollo e punteggiatura.
+
+Dopo l'aggiunta della diagnostica: **17 controlli Qt superati**, incluso il
+contenuto del pannello per un'astensione. Un nuovo test Python verifica che
+candidati e margine spieghino l'ambiguità senza alterare la decisione. Il report
+Qt aggiornato è in `build/fcitx-probe-sessions/qt-surrounding-pulluvsc/report.json`.
 
 Report locali:
 

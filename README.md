@@ -177,6 +177,8 @@ python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core
 La finestra offre un campo multilinea: spazio valuta la parola precedente,
 Backspace annulla l'ultima correzione. Il bridge reale ha superato 16 controlli
 Qt e 9 GTK; dettagli e limiti nella [guida Fcitx](docs/FCITX_PROBE.md).
+Il pannello diagnostico mostra anche il motivo delle astensioni e i candidati;
+la prova Qt aggiornata comprende 17 controlli di integrazione superati.
 
 ## Recupero dell'input
 

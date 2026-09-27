@@ -1,12 +1,14 @@
 """Persistent local engine for the isolated Fcitx probe, one token per packet."""
 
 import argparse
+from dataclasses import asdict
 import json
 import os
 from pathlib import Path
 import re
 import signal
 import socket
+import time
 
 from .cli import add_engine_arguments, load_engine
 
@@ -28,10 +30,13 @@ def decide(engine, request: bytes) -> dict:
     word, suffix = (match[1], match[2]) if match else (token, "")
     decision = engine.evaluate(word)
     return {"original": token, "output": decision.output + suffix,
-            "action": decision.action, "reason": decision.reason}
+            "action": decision.action, "reason": decision.reason,
+            "candidates": [asdict(candidate) for candidate in decision.candidates[:3]],
+            "score_margin": decision.score_margin,
+            "required_margin": engine.policy.min_score_margin}
 
 
-def serve(engine, path: Path, ready: Path):
+def serve(engine, path: Path, ready: Path, diagnostics: Path | None = None):
     if len(os.fsencode(path)) >= 108:
         raise ValueError("Percorso del socket troppo lungo.")
     # Refuse to overwrite a socket from another running session.
@@ -73,6 +78,17 @@ def serve(engine, path: Path, ready: Path):
                         client.send(json.dumps(response, ensure_ascii=False).encode("utf-8"))
                     except OSError:
                         pass  # Client already declined a late response.
+                    if diagnostics is not None:
+                        # This is an engine decision, not an application acknowledgement.
+                        # Publish after replying, keeping disk I/O out of the response budget.
+                        snapshot = {**response, "time_ns": time.time_ns(), "source": "engine_decision"}
+                        temporary = diagnostics.with_suffix(".tmp")
+                        try:
+                            temporary.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
+                            temporary.chmod(0o600)
+                            temporary.replace(diagnostics)
+                        except OSError:
+                            pass  # Diagnostics must not disable typing.
         finally:
             path.unlink(missing_ok=True)
 
@@ -81,11 +97,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--socket", type=Path, required=True)
     parser.add_argument("--ready", type=Path, required=True)
+    parser.add_argument("--diagnostics", type=Path, help="Ultima analisi locale per la finestra di prova")
     add_engine_arguments(parser)
     args = parser.parse_args(argv)
     try:
         engine = load_engine(args)
-        serve(engine, args.socket, args.ready)
+        serve(engine, args.socket, args.ready, args.diagnostics)
     except (OSError, ValueError) as error:
         parser.exit(2, f"Errore: {error}\n")
     return 0

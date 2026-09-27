@@ -154,6 +154,9 @@ def exercise(app, status_path, client, env, mode, popup=False, core=None):
         clear()
         text("proggeto ")
         check("real_engine_abstains_on_two_edits", "paragraph", "proggeto ")
+        diagnostic = wait_for(lambda: (value if "edit_distance" in (value := status(status_path, client)["decision"]["text"])
+                                      and "proggeto" in value else None))
+        results.append({"test": "diagnostics_explain_abstention", "passed": True, "text": diagnostic})
         core.send_signal(signal.SIGSTOP)
         try:
             text("quesot ")
@@ -237,13 +240,15 @@ def main():
         if args.engine == "core":
             socket_path = session / "runtime/e.sock"
             ready = session / "core-ready.json"
+            diagnostics = session / "decision.json"
             with (session / "core.log").open("w") as log:
                 core = subprocess.Popen([str(ROOT / ".venv/bin/python"), "-B", "-m", "autocorrect_core.probe_server",
-                    "--socket", str(socket_path), "--ready", str(ready), "--hunspell"],
+                    "--socket", str(socket_path), "--ready", str(ready), "--diagnostics", str(diagnostics), "--hunspell"],
                     cwd=ROOT, stdout=log, stderr=log)
             children.append(core)
             wait_for(lambda: ready.exists() and json.loads(ready.read_text()), timeout=25)
             env["AUTOCORRECT_PROBE_ENGINE_SOCKET"] = str(socket_path)
+            env["AUTOCORRECT_PROBE_DIAGNOSTICS"] = str(diagnostics)
             print("Motore reale caricato: SymSpell + Hunspell.", flush=True)
         bus = subprocess.Popen(["dbus-daemon", "--session", "--nofork", "--print-address=1"],
                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
