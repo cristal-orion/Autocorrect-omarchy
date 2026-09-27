@@ -4,6 +4,9 @@ Prototipo standalone di autocorrezione italiana conservativa, basato su
 **SymSpell**. Il core è indipendente da Fcitx e restituisce candidati e una
 decisione esplicita: correggere oppure conservare l'input.
 
+Stato corrente, risultati della prova manuale e prossime priorità:
+[docs/STATUS.md](docs/STATUS.md).
+
 ## Avvio rapido
 
 Richiede Python 3.10+ con `venv` e accesso a Internet per il setup iniziale:
