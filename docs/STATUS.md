@@ -22,6 +22,13 @@ trasformare un'astensione in una correzione grammaticalmente sbagliata.
 
 ## Aggiornamenti successivi al riepilogo iniziale
 
+- Preparato l'archivio ufficiale Leipzig `ita_news_2023_100K`: 105.798 segmenti
+  di training, 13.010 di sviluppo e 13.313 riservati alla valutazione, con
+  deduplicazione e split per hash. Il database contiene 641.084 tipi bigramma
+  e 1.216.612 trigrammi, con conteggi completi dal solo training. La licenza
+  specifica resta da verificare: la pagina delle condizioni richiede una verifica
+  browser e l'archivio non contiene un avviso. [LEIPZIG_CORPUS.md](LEIPZIG_CORPUS.md).
+
 - Sweep della frequenza con Hunspell e margine 1,3: a 5.000, 3.430 correzioni
   giuste contro 2.670 a 100.000, con gli stessi 37 errori sintetici. A 1.000
   le giuste salgono a 3.523. Nei 64 controlli validi nessuna modifica; nei 24
@@ -39,7 +46,7 @@ trasformare un'astensione in una correzione grammaticalmente sbagliata.
   costruiti, i nuovi pesi aiutano alcuni typo; i bigrammi troncati non bastano
   per la previsione colloquiale desiderata. Non abbiamo ancora portato LatinIME
   o collegato il contesto a Fcitx. Risultati e criteri: [AOSP_DATA.md](AOSP_DATA.md).
-- Suite Python aggiornata: **85 test superati**.
+- Suite Python aggiornata: **92 test superati**.
 
 ## Obiettivo
 

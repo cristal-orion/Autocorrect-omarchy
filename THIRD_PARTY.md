@@ -38,6 +38,22 @@ Abbiamo consultato `scripts/wordlist.py` e `scripts/wordlist_combined.py` nella
 stessa revisione per capire il formato. Il parser Python in questo repository
 è una nostra implementazione; non incorpora quegli script o i tool binari.
 
+## Archivio Leipzig `ita_news_2023_100K`
+
+- Editore: **Leipzig Corpora Collection**, Università di Lipsia.
+- Download ufficiale: <https://downloads.wortschatz-leipzig.de/corpora/ita_news_2023_100K.tar.gz>.
+- SHA-256: `5db4079d208b80a1cab4fed9f2995bbc1433c32edad99d00d5b0e79d006e6869`.
+- I metadati nell'archivio dichiarano build 2024-01-12 e 100.000 frasi.
+- **Licenza dell'archivio non ancora verificata**: il 27 settembre 2026 le pagine
+  ufficiali `/en/usage` e `/en/download/Italian` hanno restituito una verifica
+  Anubis; l'archivio non include un avviso di licenza. Non deduciamo la licenza
+  di questi dati da quella dichiarata per le liste sorgenti AOSP.
+
+La preparazione locale normalizza e deduplica segmenti, li separa per hash e conta
+gli n-grammi del solo training. Il repository versiona il programma originale;
+testi e dati derivati rimangono fuori da Git. Comandi, limitazioni dello split e
+metadati: [docs/LEIPZIG_CORPUS.md](docs/LEIPZIG_CORPUS.md).
+
 ## LatinIME: selezione del codice per la prossima prova
 
 Fonte preferita: **Android Open Source Project**,

@@ -53,6 +53,10 @@ bigrammi e risultati: [docs/AOSP_DATA.md](docs/AOSP_DATA.md). I valori upstream
 sono punteggi compressi e ranghi; non sostituiscono i conteggi richiesti dalle
 soglie automatiche del core.
 
+Per preparare conteggi completi da un primo corpus italiano di notizie, vedere
+[docs/LEIPZIG_CORPUS.md](docs/LEIPZIG_CORPUS.md). Lo sweep della frequenza a margine
+fisso è in [docs/FREQUENCY_SWEEP.md](docs/FREQUENCY_SWEEP.md).
+
 ### Correzione di token singoli
 
 Esempi del comportamento iniziale:

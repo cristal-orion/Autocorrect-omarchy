@@ -173,3 +173,7 @@ per il percorso Python restano disponibili parser, dati e confronto separato.
 Prima di parlare di un modello italiano adeguato servono conteggi n-gramma più
 completi e testi più vicini all'uso quotidiano. Il file sperimentale fornisce
 un lessico e alcune associazioni utili per le prove, ma non risolve quel bisogno.
+
+Aggiornamento: abbiamo preparato un primo archivio ufficiale di notizie italiane
+di Lipsia, con split e conteggi completi del training. Comandi e verifica di
+licenza ancora aperta: [LEIPZIG_CORPUS.md](LEIPZIG_CORPUS.md).
