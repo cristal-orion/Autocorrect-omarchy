@@ -64,14 +64,18 @@ def main(argv=None) -> int:
     parser.add_argument("--interactive", action="store_true", help="Editor con tre suggerimenti contestuali e memoria personale")
     parser.add_argument("--corpus", type=Path, action="append", default=[],
                         help="Solo interattiva: file UTF-8 di frasi al posto della base demo; ripetibile")
+    parser.add_argument("--aosp-wordlist", type=Path,
+                        help="Solo interattiva: wordlist italiana .combined, pesi sperimentali al posto della demo")
     parser.add_argument("--memory", type=Path, help="Solo interattiva: file SQLite della memoria personale")
     parser.add_argument("--no-learn", action="store_true", help="Solo interattiva: non legge né salva la memoria personale")
     add_engine_arguments(parser)
     args = parser.parse_args(argv)
     if args.interactive and (args.words or args.stdin or args.json or args.context != "text"):
         parser.error("--interactive richiede input dal terminale e contesto text, senza parole, --stdin o --json.")
-    if not args.interactive and (args.corpus or args.memory is not None or args.no_learn):
-        parser.error("--corpus, --memory e --no-learn richiedono --interactive.")
+    if not args.interactive and (args.corpus or args.aosp_wordlist or args.memory is not None or args.no_learn):
+        parser.error("--corpus, --aosp-wordlist, --memory e --no-learn richiedono --interactive.")
+    if args.corpus and args.aosp_wordlist:
+        parser.error("Scegli --corpus oppure --aosp-wordlist.")
     if not args.interactive and bool(args.words) == args.stdin:
         parser.error("Fornisci parole come argomenti oppure --stdin.")
     if not 1 <= args.limit <= 100:
@@ -80,7 +84,8 @@ def main(argv=None) -> int:
         engine = load_engine(args)
         if args.interactive:
             from .interactive import run
-            return run(engine, corpus_paths=args.corpus, memory_path=args.memory, learn=not args.no_learn)
+            return run(engine, corpus_paths=args.corpus, memory_path=args.memory, learn=not args.no_learn,
+                       aosp_wordlist=args.aosp_wordlist)
         tokens = (line.rstrip("\r\n") for line in sys.stdin) if args.stdin else args.words
         for token in tokens:
             result = engine.evaluate(token, context=args.context, limit=args.limit)

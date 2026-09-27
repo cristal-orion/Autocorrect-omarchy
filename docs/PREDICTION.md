@@ -62,6 +62,13 @@ La CLI carica il corpus come base della sessione senza importarlo nella memoria
 personale. Un corpus grande richiederà più tempo e memoria; questa versione
 costruisce i conteggi in RAM.
 
+In alternativa, `--aosp-wordlist FILE` carica i pesi unigramma e i bigrammi
+ordinati della wordlist italiana sperimentale AOSP, sostituendo la demo. La CLI
+indica `aosp-pesi`. Questo formato contiene punteggi compressi e ranghi;
+l'adattatore usa pesi euristici senza ricostruire i conteggi mancanti. Per una
+prova isolata usare `--no-learn`. Comandi, provenienza e misure separate in
+[AOSP_DATA.md](AOSP_DATA.md).
+
 Percorso predefinito della memoria:
 
 ```text

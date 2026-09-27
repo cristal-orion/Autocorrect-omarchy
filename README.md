@@ -47,6 +47,12 @@ un ambiente creato prima della CLI interattiva:
 `.venv/bin/python -m pip install -e .`.
 Comandi, apprendimento e limiti: [docs/PREDICTION.md](docs/PREDICTION.md).
 
+La CLI può anche caricare la wordlist italiana AOSP sperimentale con
+`--aosp-wordlist FILE`. Importazione verificata, confronto separato di lessico e
+bigrammi e risultati: [docs/AOSP_DATA.md](docs/AOSP_DATA.md). I valori upstream
+sono punteggi compressi e ranghi; non sostituiscono i conteggi richiesti dalle
+soglie automatiche del core.
+
 ### Correzione di token singoli
 
 Esempi del comportamento iniziale:

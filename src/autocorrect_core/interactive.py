@@ -145,15 +145,24 @@ def run_session(predictor: ContextPredictor, memory: PersonalMemory | None, *, i
             print("Confermata; memoria disattivata.")
 
 
-def run(engine, *, corpus_paths=(), memory_path=None, learn=True) -> int:
+def run(engine, *, corpus_paths=(), memory_path=None, learn=True, aosp_wordlist=None) -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise ValueError("--interactive richiede un terminale. Per JSONL usa --stdin --json.")
-    base, label, count = load_base(list(corpus_paths))
+    if aosp_wordlist is not None:
+        if corpus_paths:
+            raise ValueError("Scegli corpus oppure wordlist AOSP.")
+        from .aosp_data import load_wordlist
+        data = load_wordlist(aosp_wordlist)
+        base, label = data.model(), "aosp-pesi"
+        description = f"{len(data.scores)} voci, {len(data.bigrams)} bigrammi. Pesi euristici, non conteggi di corpus."
+    else:
+        base, label, count = load_base(list(corpus_paths))
+        description = f"{count} frasi. " + ("Piccolo campione dimostrativo, non italiano generale." if label == "demo" else "Corpus fornito dall'utente.")
     memory = PersonalMemory(memory_path or default_memory()) if learn else None
     try:
         predictor = ContextPredictor(engine, base, memory.model if memory else None, base_label=label)
         print("Autocorrect · laboratorio contestuale offline")
-        print(f"Base: {label}, {count} frasi. " + ("Piccolo campione dimostrativo, non italiano generale." if label == "demo" else "Corpus fornito dall'utente."))
+        print(f"Base: {label}, {description}")
         print(f"Memoria personale: {memory.path}" if memory else "Memoria personale disattivata: nessuna lettura o scrittura.")
         print("Prova: ci vediamo [spazio], poi Tab. Oppure scrivi una frase tua.")
         print(HELP)

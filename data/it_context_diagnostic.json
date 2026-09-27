@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "format_version": 1,
+    "scope": "24 original authored diagnostic cases, fixed before the first run. Not a representative natural-text benchmark or an independent quality claim.",
+    "purpose": "Observe the same predictor and lexicon with and without the imported ranked bigrams. Targets for next_word are one intended continuation, not the only valid one.",
+    "training": "These cases are not loaded into the base or personal model. No overlap guarantee with upstream corpora."
+  },
+  "cases": [
+    {"task": "correction", "previous": "ci sentiamo ", "input": "domnai", "expected": "domani"},
+    {"task": "correction", "previous": "ho lavato il ", "input": "piato", "expected": "piatto"},
+    {"task": "correction", "previous": "oggi devo ", "input": "lavoarre", "expected": "lavorare"},
+    {"task": "correction", "previous": "ho ricevuto un ", "input": "mesaggio", "expected": "messaggio"},
+    {"task": "correction", "previous": "mi sembra ", "input": "imposibile", "expected": "impossibile"},
+    {"task": "correction", "previous": "andiamo a ", "input": "mangaire", "expected": "mangiare"},
+    {"task": "correction", "previous": "ho perso le ", "input": "chaivi", "expected": "chiavi"},
+    {"task": "correction", "previous": "ci vediamo ", "input": "stasrea", "expected": "stasera"},
+    {"task": "correction", "previous": "non riesco a ", "input": "dormrie", "expected": "dormire"},
+    {"task": "correction", "previous": "devo ancora ", "input": "finrie", "expected": "finire"},
+    {"task": "correction", "previous": "sto preparando la ", "input": "cnea", "expected": "cena"},
+    {"task": "correction", "previous": "questo testo è ", "input": "interesasnte", "expected": "interessante"},
+    {"task": "next_word", "previous": "grazie ", "input": "", "expected": "mille"},
+    {"task": "next_word", "previous": "buona ", "input": "", "expected": "sera"},
+    {"task": "next_word", "previous": "a ", "input": "", "expected": "presto"},
+    {"task": "next_word", "previous": "non lo ", "input": "", "expected": "so"},
+    {"task": "next_word", "previous": "sono ", "input": "", "expected": "stanco"},
+    {"task": "next_word", "previous": "ho ", "input": "", "expected": "fame"},
+    {"task": "next_word", "previous": "per ", "input": "", "expected": "favore"},
+    {"task": "next_word", "previous": "va ", "input": "", "expected": "bene"},
+    {"task": "next_word", "previous": "che ", "input": "", "expected": "cosa"},
+    {"task": "next_word", "previous": "come ", "input": "", "expected": "stai"},
+    {"task": "next_word", "previous": "questa ", "input": "", "expected": "sera"},
+    {"task": "next_word", "previous": "mi ", "input": "", "expected": "dispiace"}
+  ]
+}

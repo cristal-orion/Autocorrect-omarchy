@@ -20,6 +20,21 @@ Il prossimo lavoro deve concentrarsi sulla scelta dei candidati e sul contesto,
 con dati adeguati e valutazione separata. Abbassare soltanto il margine può
 trasformare un'astensione in una correzione grammaticalmente sbagliata.
 
+## Aggiornamenti successivi al riepilogo iniziale
+
+- La finestra Qt offre ora **Margine minimo** (Alt+M), da 0,01 a 5,00, con
+  ripristino a 1,30. La modifica vale dalla prossima parola nella sola sessione.
+  Verifica: 22 controlli Qt, inclusi soglia, diagnostica e annullamento.
+- Abbiamo importato la wordlist italiana AOSP sperimentale: 185.605 forme e
+  99.773 bigrammi utilizzabili. I valori sono codici compressi e ranghi, non
+  conteggi. Nel confronto sullo sviluppo, l'espansione del lessico mantenendo
+  le frequenze baseline lascia invariate le correzioni giuste e sbagliate.
+- La CLI può provare i dati con `--aosp-wordlist FILE`. Nei 24 casi diagnostici
+  costruiti, i nuovi pesi aiutano alcuni typo; i bigrammi troncati non bastano
+  per la previsione colloquiale desiderata. Non abbiamo ancora portato LatinIME
+  o collegato il contesto a Fcitx. Risultati e criteri: [AOSP_DATA.md](AOSP_DATA.md).
+- Suite Python aggiornata: **85 test superati**.
+
 ## Obiettivo
 
 Correttore italiano per tastiera fisica su Linux/Omarchy, Wayland e Hyprland:
