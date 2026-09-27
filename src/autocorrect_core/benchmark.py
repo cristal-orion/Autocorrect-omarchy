@@ -12,7 +12,7 @@ import platform
 import time
 
 from .cli import add_engine_arguments, load_engine
-from .engine import CONTEXTS
+from .engine import CONTEXTS, normalize
 
 
 def load_dataset(path: Path) -> tuple[list[dict], dict]:
@@ -172,11 +172,15 @@ def main(argv=None):
                     lookup_samples.append(elapsed)
         grouped = defaultdict(lambda: ([], []))
         frequency_groups = defaultdict(lambda: ([], []))
+        lexicon_groups = defaultdict(lambda: ([], []))
         for case, decision in zip(cases, decisions):
             grouped[case["category"]][0].append(case)
             grouped[case["category"]][1].append(decision)
             frequency_groups[case.get("frequency_band", "unspecified")][0].append(case)
             frequency_groups[case.get("frequency_band", "unspecified")][1].append(decision)
+            membership = "known" if normalize(case["input"]) in engine.symspell.words else "unknown"
+            lexicon_groups[membership][0].append(case)
+            lexicon_groups[membership][1].append(decision)
         report = {
             "scope": metadata.get("scope", "User-supplied dataset; no representativeness or held-out status assumed."),
             "dataset_metadata": metadata,
@@ -186,12 +190,14 @@ def main(argv=None):
             "python": platform.python_version(), "platform": platform.platform(),
             "symspellpy": version("symspellpy"), "policy": asdict(engine.policy),
             "dictionary_sha256": engine.dictionary_sha256, "dictionary_words": engine.word_count,
+            "word_validator": engine.word_validator.metadata if engine.word_validator is not None else None,
             "dataset_sha256": hashlib.sha256(args.dataset.read_bytes()).hexdigest(),
             "protected_words_sha256": hashlib.sha256("\n".join(sorted(engine.protected)).encode()).hexdigest(),
             "protected_word_count": len(engine.protected),
             "quality": quality(cases, decisions, details=args.details),
             "by_category": {name: quality(*values, details="none") for name, values in sorted(grouped.items())},
             "by_frequency_band": {name: quality(*values, details="none") for name, values in sorted(frequency_groups.items())},
+            "by_lexicon_membership": {name: quality(*values, details="none") for name, values in sorted(lexicon_groups.items())},
             "performance": {"dictionary_load_ms": round(load_ms, 3),
                             "memory": process_memory(),
                             "all_tokens": timings(all_samples),

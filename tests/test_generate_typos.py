@@ -156,6 +156,11 @@ class TypoGeneratorTest(unittest.TestCase):
                 cases = load_cases(root / "suite" / f"{split}.json")
                 self.assertFalse(any(c["expected"] == "questo" for c in cases))
 
+    def test_generator_does_not_accept_a_silently_ignored_validator_option(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as raised:
+            main(["--hunspell"])
+        self.assertEqual(raised.exception.code, 2)
+
     def test_benchmark_detail_filter_does_not_hide_error_counts(self):
         cases = [{"input": "x", "expected": "y"}, {"input": "z", "expected": "z"}]
         decisions = [Decision("x", "x", "keep", "test"), Decision("z", "q", "correct", "test")]

@@ -10,7 +10,7 @@ from pathlib import Path
 import tempfile
 
 from .benchmark import load_cases
-from .cli import add_engine_arguments, load_personal_words
+from .cli import add_dictionary_arguments, load_personal_words
 from .dictionary import default_dictionary, validate_download
 from .engine import latin_word, normalize, parse_lexicon, read_protected
 
@@ -239,7 +239,7 @@ def main(argv=None) -> int:
     parser.add_argument("--max-length", type=int, default=20)
     parser.add_argument("--exclude-cases", type=Path, action="append", default=[], help="Esclude input e target di dataset già usati")
     parser.add_argument("--output-dir", type=Path, default=Path("benchmark-data/it-seed42"))
-    add_engine_arguments(parser)
+    add_dictionary_arguments(parser)
     args = parser.parse_args(argv)
     try:
         config = GenerationConfig(**{key: getattr(args, key) for key in GenerationConfig.__dataclass_fields__})

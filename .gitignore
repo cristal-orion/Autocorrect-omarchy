@@ -8,3 +8,9 @@ backups/
 dist/
 benchmark-results/
 benchmark-data/
+# Personal SwiftKey export supplied for local inspection.
+/com.touchtype.swiftkey.7z
+/com.touchtype.swiftkey/
+/vocabulary.txt
+/dynamic.lm
+/swiftkey-onedrive/

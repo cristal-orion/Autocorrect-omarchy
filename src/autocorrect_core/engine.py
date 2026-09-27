@@ -5,6 +5,7 @@ import hashlib
 from importlib.resources import files
 import math
 from pathlib import Path
+from typing import Protocol
 import unicodedata
 
 from symspellpy import SymSpell, Verbosity
@@ -101,9 +102,17 @@ class Decision:
         return asdict(self)
 
 
+class WordValidator(Protocol):
+    metadata: dict
+
+    def spell(self, word: str) -> bool: ...
+
+
 class AutocorrectEngine:
-    def __init__(self, dictionary: Path, *, protected_words=(), policy: Policy | None = None):
+    def __init__(self, dictionary: Path, *, protected_words=(), policy: Policy | None = None,
+                 word_validator: WordValidator | None = None):
         self.policy = policy or Policy()
+        self.word_validator = word_validator
         self.dictionary_path = Path(dictionary)
         raw = self.dictionary_path.read_bytes()
         self.dictionary_sha256 = hashlib.sha256(raw).hexdigest()
@@ -143,6 +152,8 @@ class AutocorrectEngine:
             return keep("apostrophe_requires_context")
         if not latin_word(word):
             return keep("non_word")
+        if self.word_validator is not None and self.word_validator.spell(word):
+            return keep("valid_word")
         # Never turn lacqua into acqua just because elisions are absent upstream.
         for prefix in ELISION_PREFIXES:
             suffix = word[len(prefix):]

@@ -45,6 +45,24 @@ Ulteriori fonti considerate:
 - PAISÀ: possibile ricerca futura sul contesto, ma il corpus distribuito è
   CC BY-NC-SA 3.0 e le liste pronte sono di lemmi, non di tutte le forme flesse.
 
+## Hunspell italiano opzionale
+
+Il filtro `--hunspell` legge i file di sistema `it_IT.aff` e `it_IT.dic` da
+`/usr/share/hunspell`, oppure il prefisso indicato con `--hunspell-dictionary`.
+Il setup Python non installa pacchetti di sistema né scarica questi file.
+Su Arch/Omarchy i pacchetti necessari sono `hunspell` e `hunspell-it`.
+
+Nel primo esperimento abbiamo usato `hunspell 1.7.3-1` e `hunspell-it 2.4-13`.
+L'intestazione locale di `it_IT.aff` indica il progetto dizionario italiano
+di Gianluca Turconi e Davide Prina, versione 2.4 del 1 settembre 2007, e
+licenza **GPL-3.0-or-later**. Questa informazione riguarda quei file specifici.
+Il repository contiene il binding all'API C e piccole fixture originali per
+i test; legge il dizionario installato senza copiarlo nei file versionati.
+
+Il benchmark include i checksum SHA-256 dei due file. Un aggiornamento del
+pacchetto può cambiare i risultati: confrontare checksum e versione della
+libreria quando si ripete l'esperimento. Dettagli in [HUNSPELL.md](HUNSPELL.md).
+
 ## Normalizzazione e protezioni
 
 All'interno del motore: Unicode NFC, minuscole e apostrofi tipografici ricondotti

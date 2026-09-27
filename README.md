@@ -18,6 +18,34 @@ Il setup installa le dipendenze nella `.venv` del progetto e scarica una revisio
 verificata del dizionario italiano (100.000 voci) nei dati locali dell'utente.
 Il funzionamento successivo è offline; non serve `sudo`.
 
+### Prova interattiva con contesto
+
+```sh
+./autocorrect --interactive
+```
+
+Scrivi `ci vediamo `, incluso lo spazio: il terminale mostra tre suggerimenti.
+Usa **Tab/F1**, **F2** o **F3** per sceglierli. **Invio** conferma e apprende la
+frase; **Ctrl+Z** annulla una modifica, **Ctrl+C** scarta la riga, `/exit` esce.
+La memoria personale sopravvive al riavvio della CLI.
+
+La base iniziale contiene **91 frasi dimostrative originali**, non un modello
+generale dell'italiano. La CLI mostra l'origine di ciascun suggerimento:
+`demo`, `corpus`, `personale` o `frequenza`. Puoi sostituire la base demo con
+un file UTF-8 di frasi:
+
+```sh
+./autocorrect --interactive --corpus /percorso/frasi.txt
+./autocorrect --interactive --no-learn
+```
+
+`--no-learn` esclude lettura e scrittura della memoria personale. Per aggiornare
+un ambiente creato prima della CLI interattiva:
+`.venv/bin/python -m pip install -e .`.
+Comandi, apprendimento e limiti: [docs/PREDICTION.md](docs/PREDICTION.md).
+
+### Correzione di token singoli
+
 Esempi del comportamento iniziale:
 
 | Input | Output automatico | Motivo |
@@ -56,6 +84,28 @@ Accetta una parola per riga e commenti con `#`.
 Ogni argomento è un token completo. Frasi, URL, percorsi e parole con
 punteggiatura non vengono segmentati. Non c'è rilevamento automatico di app,
 campi password o lingua: `--context` serve a provare il contratto del core.
+
+### Filtro Hunspell sperimentale
+
+```sh
+./autocorrect --hunspell quesot compilaste --json
+./autocorrect --hunspell --stdin --json
+
+# Prefisso senza estensione: legge /percorso/it_IT.aff e /percorso/it_IT.dic
+./autocorrect --hunspell-dictionary /percorso/it_IT quesot
+```
+
+Con `--hunspell` il motore conserva anche le parole che Hunspell riconosce e
+che mancano nella lista di frequenze (`reason: valid_word`). SymSpell continua
+a generare i candidati per gli altri token. Il filtro è opzionale e richiede
+la libreria di sistema `hunspell` e il dizionario `hunspell-it`, già presenti
+sulla macchina di sviluppo. Il percorso predefinito è `/usr/share/hunspell/it_IT`.
+Un errore nel caricamento del filtro richiesto interrompe il comando.
+
+Primo confronto sullo sviluppo: **37 sostituzioni sbagliate invece di 40**,
+con 4 correzioni giuste in meno su 6.352 typo. I 64 nuovi casi di parole valide
+(56 assenti dalla lista di frequenze) restano intatti con entrambe le versioni.
+Metodologia, prestazioni e limiti: [docs/HUNSPELL.md](docs/HUNSPELL.md).
 
 ## Test e benchmark
 

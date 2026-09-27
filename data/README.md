@@ -46,5 +46,25 @@ Il benchmark continua ad accettare anche il formato a lista di questo smoke test
 
 Vedere [il generatore](../docs/TYPO_GENERATOR.md) e
 [i risultati estesi](../docs/BENCHMARK_GENERATED.md). I negativi sintetici sono
-parole già presenti nel dizionario: servono ancora esempi indipendenti di parole
-valide sconosciute per valutare davvero i falsi positivi.
+parole già presenti nel dizionario; il campione seguente aggiunge una prima
+prova sulle parole valide sconosciute.
+
+## Parole valide per il confronto Hunspell
+
+`it_valid_words_development.json` contiene 64 casi manuali di sviluppo:
+forme flesse, verbi con pronomi, nomi/aggettivi, termini tecnici e prestiti.
+Abbiamo fissato l'elenco prima di osservare le decisioni dei due motori e
+conservato tutti i casi, inclusi quelli già nella lista di frequenze e quelli
+che Hunspell non riconosce. La validità attesa è un'etichetta manuale per
+l'uso indicato; l'accettazione di Hunspell non definisce la correttezza linguistica.
+
+Con la revisione fissata del dizionario SymSpell, 56 input sono sconosciuti e
+8 sono già presenti. Il benchmark li separa in `by_lexicon_membership`.
+Tre degli sconosciuti appartengono al glossario protetto del progetto.
+Entrambe le versioni conservano 64/64 input; con il filtro, 40 casi ricevono
+il motivo `valid_word`. Molte forme sono lunghe e già poco esposte a sostituzioni:
+occorrono anche esempi validi più vicini a parole comuni.
+
+Tutti i casi richiedono conservazione: da questo file non si possono stimare
+precisione delle correzioni o copertura dei typo. Non è un campione indipendente
+di valutazione. Risultati e comandi: [HUNSPELL.md](../docs/HUNSPELL.md).
