@@ -1,4 +1,5 @@
-// Minimal Fcitx feasibility probe: fixed ASCII replacements, no language model.
+// Isolated Fcitx probe: fixed replacements or a bounded request to the real core.
+#include "engine_client.h"
 #include <fcitx/addonfactory.h>
 #include <fcitx/addonmanager.h>
 #include <fcitx/candidatelist.h>
@@ -17,6 +18,18 @@
 namespace {
 const std::map<std::string, std::string> replacements{
     {"quesot", "questo"}, {"qaundo", "quando"}, {"domnai", "domani"}};
+
+std::string correction(const std::string &token) {
+    if (const auto *socket = std::getenv("AUTOCORRECT_PROBE_ENGINE_SOCKET")) {
+        return queryEngine(socket, token);
+    }
+    const auto found = replacements.find(token);
+    return found == replacements.end() ? token : found->second;
+}
+
+bool separator(char character) {
+    return character == ' ' || character == '\n' || character == '\r' || character == '\t';
+}
 
 struct State : fcitx::InputContextProperty {
     std::string composing;
@@ -143,7 +156,7 @@ public:
             if (!state->waitingForSurrounding && surroundingUsable(ic) && ic->surroundingText().text() == state->expectedText &&
                 ic->surroundingText().cursor() == state->expectedCursor) {
                 const auto original = state->original;
-                const auto count = state->replacement.size(); // Probe replacements are ASCII.
+                const auto count = fcitx::utf8::length(state->replacement);
                 state->clearUndo();
                 ic->deleteSurroundingText(-static_cast<int>(count), count);
                 if (preedit) {
@@ -198,9 +211,7 @@ public:
                 return;
             }
             const auto original = state->composing;
-            const auto found = replacements.find(original);
-            const auto output = (found != replacements.end() && !state->suppressNextSpace)
-                                    ? found->second : original;
+            const auto output = state->suppressNextSpace ? original : correction(original);
             state->suppressNextSpace = false;
             state->composing.clear();
             render(ic, state);
@@ -240,7 +251,8 @@ private:
         if (byte < removeCount) {
             return;
         }
-        state->expectedCursor = surrounding.cursor() - removeCount + output.size();
+        const auto removeChars = removeCount ? fcitx::utf8::length(original) : 0;
+        state->expectedCursor = surrounding.cursor() - removeChars + fcitx::utf8::length(output);
         state->expectedText = surrounding.text();
         state->expectedText.replace(byte - removeCount, removeCount, output);
     }
@@ -253,24 +265,24 @@ private:
         const auto &text = ic->surroundingText().text();
         const auto cursor = cursorByte(ic);
         auto start = cursor;
-        while (start && text[start - 1] >= 'a' && text[start - 1] <= 'z') {
+        while (start && !separator(text[start - 1])) {
             --start;
         }
-        if (start && text[start - 1] != ' ' && text[start - 1] != '\n' && text[start - 1] != '\t') {
+        if (cursor - start > 512) {
             return;
         }
-        if (cursor < text.size() && ((text[cursor] >= 'a' && text[cursor] <= 'z') ||
-                                     (text[cursor] >= 'A' && text[cursor] <= 'Z'))) {
+        if (cursor < text.size() && !separator(text[cursor])) {
             return;
         }
         const auto original = text.substr(start, cursor - start);
-        const auto found = replacements.find(original);
-        if (found == replacements.end()) {
+        const auto output = correction(original);
+        if (output == original) {
             return;
         }
-        rememberUndo(ic, state, original, found->second + " ", original.size());
-        ic->deleteSurroundingText(-static_cast<int>(original.size()), original.size());
-        ic->commitString(found->second + " ");
+        const auto count = fcitx::utf8::length(original);
+        rememberUndo(ic, state, original, output + " ", original.size());
+        ic->deleteSurroundingText(-static_cast<int>(count), count);
+        ic->commitString(output + " ");
         diagnostic(ic, "correct-surrounding");
         event.filterAndAccept();
     }

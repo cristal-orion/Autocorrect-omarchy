@@ -30,6 +30,8 @@ esplicito di acquisizione del dizionario.
 - `prediction.py`: suggerimenti contestuali espliciti, n-grammi e completamenti.
 - `personal.py`: conteggi personali in SQLite, aggiornati alla conferma della frase.
 - `interactive.py`: editor terminale con tre suggerimenti tramite prompt_toolkit.
+- `probe_server.py`: processo persistente del core per la prova Fcitx, raggiungibile
+  solo tramite socket Unix locale. Applica la politica del core, senza apprendimento.
 - `swiftkey_inspect.py`: lettura strutturale dei modelli Fluency; produce statistiche,
   senza decodificare il vocabolario o importare i modelli nella memoria personale.
 

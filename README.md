@@ -168,6 +168,16 @@ correzioni prefissate: 36 controlli superati nei widget Qt/GTK su Wayland.
 Per aprirla: `python scripts/run-fcitx-probe.py --client qt --mode surrounding`,
 dopo `bash scripts/build-fcitx-probe.sh`.
 
+Per provare **SymSpell + Hunspell su un paragrafo digitato**, usare:
+
+```sh
+python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core
+```
+
+La finestra offre un campo multilinea: spazio valuta la parola precedente,
+Backspace annulla l'ultima correzione. Il bridge reale ha superato 16 controlli
+Qt e 9 GTK; dettagli e limiti nella [guida Fcitx](docs/FCITX_PROBE.md).
+
 ## Recupero dell'input
 
 Sulla macchina di sviluppo è predisposto un red button indipendente dal progetto:

@@ -11,6 +11,7 @@ import configparser
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import tempfile
 import time
@@ -53,7 +54,7 @@ def status(path, client):
             for name in ("normal", "password", "code", "second")}
 
 
-def exercise(app, status_path, client, env, mode, popup=False):
+def exercise(app, status_path, client, env, mode, popup=False, core=None):
     clients = lambda: json.loads(command(["hyprctl", "-j", "clients"]))
     window = wait_for(lambda: next((item for item in clients() if item["pid"] == app.pid), None))
     target = "address:" + window["address"]
@@ -72,7 +73,10 @@ def exercise(app, status_path, client, env, mode, popup=False):
 
     def text(value):
         for character in value:
-            key({" ": "space", "è": "egrave"}.get(character, character))
+            if character.isupper():
+                key(character.lower(), "SHIFT")
+            else:
+                key({" ": "space", "è": "egrave", ".": "period", "\n": "Return"}.get(character, character))
 
     results = []
 
@@ -135,6 +139,33 @@ def exercise(app, status_path, client, env, mode, popup=False):
     text("quesot")
     key("Tab", "SHIFT")
     check("focus_out_commits_original", "second", "quesot")
+    if core is not None and client == "qt":
+        key("Tab")
+        key("Tab")
+        wait_for(lambda: status(status_path, client)["paragraph"]["focus"])
+        text("oggi provo quesot sistema qaundo scrivo un progeto interesasnte. \nLa seconda riga resta normale. ")
+        expected = "oggi provo questo sistema quando scrivo un progetto interessante. \nLa seconda riga resta normale. "
+        check("real_engine_multiline_paragraph", "paragraph", expected)
+        text("quesot ")
+        check("real_engine_last_word", "paragraph", expected + "questo ")
+        key("BackSpace")
+        key("space")
+        check("real_engine_multiline_undo", "paragraph", expected + "quesot ")
+        clear()
+        text("proggeto ")
+        check("real_engine_abstains_on_two_edits", "paragraph", "proggeto ")
+        core.send_signal(signal.SIGSTOP)
+        try:
+            text("quesot ")
+            check("stalled_engine_preserves_input", "paragraph", "proggeto quesot ")
+        finally:
+            core.send_signal(signal.SIGCONT)
+        text("qaundo ")
+        check("engine_recovers_without_stale_reply", "paragraph", "proggeto quesot quando ")
+        core.terminate()
+        core.wait(timeout=3)
+        text("quesot ")
+        check("unavailable_engine_preserves_input", "paragraph", "proggeto quesot quando quesot ")
     return {"client": client, "mode": mode, "xwayland": window.get("xwayland"),
             "input_method": command(["fcitx5-remote", "-n"], env=env), "tests": results,
             "all_passed": all(item["passed"] for item in results), "popup_capture": popup_capture}
@@ -146,7 +177,11 @@ def main():
     parser.add_argument("--client", choices=("qt", "gtk"), default="qt")
     parser.add_argument("--popup", action="store_true", help="Mostra candidati dimostrativi non selezionabili")
     parser.add_argument("--test", action="store_true", help="Invia tasti solo alla finestra di prova tramite Hyprland")
+    parser.add_argument("--engine", choices=("fixed", "core"), default="fixed",
+                        help="fixed: tre sostituzioni; core: SymSpell + Hunspell persistenti")
     args = parser.parse_args()
+    if args.engine == "core" and (args.mode != "surrounding" or args.popup):
+        parser.error("Il motore reale si prova con --mode surrounding, senza --popup.")
     binary = ROOT / "build/fcitx-probe" / f"autocorrect-probe-{args.client}"
     library = ROOT / "build/fcitx-probe/libautocorrectprobe.so"
     if not binary.exists() or not library.exists():
@@ -191,10 +226,25 @@ def main():
     status_path = session / ("status.json" if args.client == "qt" else "status.ini")
     env.update({"QT_IM_MODULE": "fcitx", "GTK_IM_MODULE": "fcitx", "QT_QPA_PLATFORM": "wayland",
                 "GDK_BACKEND": "wayland", "AUTOCORRECT_PROBE_STATUS": str(status_path)})
+    env.pop("AUTOCORRECT_PROBE_ENGINE_SOCKET", None)
+    if args.test:
+        env["AUTOCORRECT_PROBE_TEST"] = "1"
     previous_focus = json.loads(command(["hyprctl", "-j", "activewindow"])).get("address") if args.test else None
     children = []
     print(f"Sessione isolata: {session}", flush=True)
     try:
+        core = None
+        if args.engine == "core":
+            socket_path = session / "runtime/e.sock"
+            ready = session / "core-ready.json"
+            with (session / "core.log").open("w") as log:
+                core = subprocess.Popen([str(ROOT / ".venv/bin/python"), "-B", "-m", "autocorrect_core.probe_server",
+                    "--socket", str(socket_path), "--ready", str(ready), "--hunspell"],
+                    cwd=ROOT, stdout=log, stderr=log)
+            children.append(core)
+            wait_for(lambda: ready.exists() and json.loads(ready.read_text()), timeout=25)
+            env["AUTOCORRECT_PROBE_ENGINE_SOCKET"] = str(socket_path)
+            print("Motore reale caricato: SymSpell + Hunspell.", flush=True)
         bus = subprocess.Popen(["dbus-daemon", "--session", "--nofork", "--print-address=1"],
                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         children.append(bus)
@@ -211,8 +261,9 @@ def main():
             app = subprocess.Popen([str(binary)], env=env, stdout=log, stderr=log)
         children.append(app)
         if args.test:
-            report = exercise(app, status_path, args.client, env, args.mode, args.popup)
+            report = exercise(app, status_path, args.client, env, args.mode, args.popup, core)
             report["popup_requested"] = args.popup
+            report["engine"] = args.engine
             (session / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
             print(json.dumps(report, indent=2, ensure_ascii=False))
             return 0 if report["all_passed"] else 1

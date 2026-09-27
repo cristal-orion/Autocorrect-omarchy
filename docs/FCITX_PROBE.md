@@ -1,9 +1,80 @@
-# Prima prova Fcitx su Hyprland
+# Prove Fcitx su Hyprland
 
-Prova del 27 settembre 2026: addon C++ con tre sostituzioni prefissate, senza
-modello linguistico. Serve a verificare il meccanismo di input nelle applicazioni.
+La prima prova del 27 settembre 2026 usava un addon C++ con tre sostituzioni
+prefissate. Il passaggio successivo collega il core reale nella stessa sessione
+isolata e aggiunge un campo multilinea.
 
-## Avvio manuale
+## Prova con motore reale e testo multilinea
+
+```sh
+bash scripts/build-fcitx-probe.sh
+python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core
+```
+
+La nuova finestra si chiama **Autocorrect - testo reale (SymSpell + Hunspell)**
+e apre il focus su un campo multilinea. Scrivere un paragrafo nel campo grande:
+ogni spazio valuta il token precedente. Backspace subito dopo una sostituzione
+ripristina l'originale. Il motore conserva parole note, parole Hunspell, maiuscole
+e casi che non superano le soglie del core.
+
+Esempio di input costruito per provare il percorso, premendo spazio dopo il punto:
+
+```text
+oggi provo quesot sistema qaundo scrivo un progeto interesasnte.
+```
+
+Output verificato:
+
+```text
+oggi provo questo sistema quando scrivo un progetto interessante.
+```
+
+Questa prova usa il core reale a singolo token, con il dizionario da 100.000
+frequenze e Hunspell. La politica conserva anche `proggeto`, che richiede due
+modifiche, e può conservare `domnai` per ambiguità: il risultato può differire
+dalle tre sostituzioni prefissate della prova iniziale.
+
+Il server Python carica il motore una volta. L'addon C++ gli invia il token
+tramite un socket Unix privato, con messaggi separati per richiesta. Il client
+assegna un budget di 50 ms all'attesa sul socket; errori, risposte non coerenti
+o assenza del server lasciano passare lo spazio con il testo originale. Il
+server non registra i token e non apprende. I file di stato della finestra
+contengono il testo della prova, sotto la cartella di sessione ignorata da Git.
+
+Il bridge gestisce una sequenza finale di `,.!?;:` dopo un token alfabetico,
+conservandola nella sostituzione. Tratta URL, percorsi e stringhe strutturate
+come token interi. La cancellazione e l'annullamento usano lunghezze Unicode.
+
+Limiti dell'interazione attuale:
+
+- La correzione parte allo **spazio**, non a Invio o alla sola punteggiatura.
+- Incollare un paragrafo non avvia una revisione retroattiva di tutte le parole.
+- Il modello contestuale della CLI non determina le sostituzioni in questa prova.
+- Il bridge reale è disponibile in modalità `surrounding`, senza popup.
+- La richiesta breve è sincrona nel processo Fcitx; un adapter destinato all'uso
+  continuativo richiederà ulteriori misure di latenza e valutazione del trasporto.
+
+### Verifiche del bridge reale
+
+```sh
+python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core --test
+python scripts/run-fcitx-probe.py --client gtk --mode surrounding --engine core --test
+```
+
+Risultati: **16 controlli Qt e 9 GTK superati**. Ai nove casi base, Qt aggiunge
+paragrafo multilinea, correzione e annullamento dell'ultima parola, astensione
+su due modifiche, motore sospeso con SIGSTOP, ripresa senza risposte obsolete
+e arresto del motore. I controlli Python coprono protocollo e punteggiatura.
+
+Report locali:
+
+- `build/fcitx-probe-sessions/qt-surrounding-ryyinmzm/report.json`
+- `build/fcitx-probe-sessions/gtk-surrounding-7bdkitk9/report.json`
+
+La compilazione richiede anche `json-c`; pubblica i binari con rinomina atomica,
+così le finestre già aperte possono continuare a usare la versione precedente.
+
+## Avvio manuale con sostituzioni prefissate
 
 ```sh
 bash scripts/build-fcitx-probe.sh
@@ -85,7 +156,7 @@ il testo. In questa prima prova le sostituzioni sono tutte ASCII.
 ## Ambito e passi successivi
 
 Il risultato dimostra fattibilità nei widget di prova Qt/GTK tramite moduli IM.
-Restano da verificare browser/Electron, widget multilinea, text-input-v3,
+Restano da verificare browser/Electron, altri widget multilinea, text-input-v3,
 incolla, selezioni, cambi di focus più complessi e perdita di disponibilità
 del testo circostante. I test usano eventi sintetici del compositor; la prova
 manuale aggiunge una prima verifica con tastiera fisica.
