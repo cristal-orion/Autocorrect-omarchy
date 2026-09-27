@@ -163,8 +163,10 @@ Fonti, checksum e questione della licenza dei dati:
 [docs/DICTIONARIES.md](docs/DICTIONARIES.md).
 
 Il piano originale in `piano_autocorrect_linux_codex.txt` precede la scelta di
-SymSpell. L'integrazione Fcitx e le prove di digitazione nelle applicazioni sono
-fasi successive al prototipo CLI.
+SymSpell. È disponibile una [prova Fcitx isolata](docs/FCITX_PROBE.md) con
+correzioni prefissate: 36 controlli superati nei widget Qt/GTK su Wayland.
+Per aprirla: `python scripts/run-fcitx-probe.py --client qt --mode surrounding`,
+dopo `bash scripts/build-fcitx-probe.sh`.
 
 ## Recupero dell'input
 
