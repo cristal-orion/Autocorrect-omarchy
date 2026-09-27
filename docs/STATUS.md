@@ -22,6 +22,12 @@ trasformare un'astensione in una correzione grammaticalmente sbagliata.
 
 ## Aggiornamenti successivi al riepilogo iniziale
 
+- Sweep della frequenza con Hunspell e margine 1,3: a 5.000, 3.430 correzioni
+  giuste contro 2.670 a 100.000, con gli stessi 37 errori sintetici. A 1.000
+  le giuste salgono a 3.523. Nei 64 controlli validi nessuna modifica; nei 24
+  nuovi nomi di pacchetti un errore (`manim → mani`) già presente nella baseline.
+  `maglioner → maglione` si sblocca a 20.000. Dettagli: [FREQUENCY_SWEEP.md](FREQUENCY_SWEEP.md).
+
 - La finestra Qt offre ora **Margine minimo** (Alt+M), da 0,01 a 5,00, con
   ripristino a 1,30. La modifica vale dalla prossima parola nella sola sessione.
   Verifica: 22 controlli Qt, inclusi soglia, diagnostica e annullamento.

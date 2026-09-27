@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "format_version": 1,
+    "scope": "24 authored preservation probes for real Python package names used in Italian prose. Fixed before inspecting their decisions; not representative or held out.",
+    "selection": "Project names as written on https://pypi.org/project/<input>/. These are legitimate lowercase names even when lexicons reject them. They are not added to protected.txt.",
+    "purpose": "Additional short unknown-word controls; retain every case irrespective of lexical recognition or observed outcome."
+  },
+  "cases": [
+    {"input": "polars", "expected": "polars", "category": "valid_package_name"},
+    {"input": "pandas", "expected": "pandas", "category": "valid_package_name"},
+    {"input": "numpy", "expected": "numpy", "category": "valid_package_name"},
+    {"input": "scipy", "expected": "scipy", "category": "valid_package_name"},
+    {"input": "sympy", "expected": "sympy", "category": "valid_package_name"},
+    {"input": "marimo", "expected": "marimo", "category": "valid_package_name"},
+    {"input": "manim", "expected": "manim", "category": "valid_package_name"},
+    {"input": "bokeh", "expected": "bokeh", "category": "valid_package_name"},
+    {"input": "altair", "expected": "altair", "category": "valid_package_name"},
+    {"input": "napari", "expected": "napari", "category": "valid_package_name"},
+    {"input": "pytest", "expected": "pytest", "category": "valid_package_name"},
+    {"input": "numba", "expected": "numba", "category": "valid_package_name"},
+    {"input": "xarray", "expected": "xarray", "category": "valid_package_name"},
+    {"input": "attrs", "expected": "attrs", "category": "valid_package_name"},
+    {"input": "orjson", "expected": "orjson", "category": "valid_package_name"},
+    {"input": "msgpack", "expected": "msgpack", "category": "valid_package_name"},
+    {"input": "uvicorn", "expected": "uvicorn", "category": "valid_package_name"},
+    {"input": "gunicorn", "expected": "gunicorn", "category": "valid_package_name"},
+    {"input": "starlette", "expected": "starlette", "category": "valid_package_name"},
+    {"input": "pydantic", "expected": "pydantic", "category": "valid_package_name"},
+    {"input": "jupyter", "expected": "jupyter", "category": "valid_package_name"},
+    {"input": "pyarrow", "expected": "pyarrow", "category": "valid_package_name"},
+    {"input": "pygame", "expected": "pygame", "category": "valid_package_name"},
+    {"input": "pyglet", "expected": "pyglet", "category": "valid_package_name"}
+  ]
+}
