@@ -107,6 +107,10 @@ con 4 correzioni giuste in meno su 6.352 typo. I 64 nuovi casi di parole valide
 (56 assenti dalla lista di frequenze) restano intatti con entrambe le versioni.
 Metodologia, prestazioni e limiti: [docs/HUNSPELL.md](docs/HUNSPELL.md).
 
+Per misurare le proposte sul vocabolario personale senza proteggerlo durante
+il test e preparare una revisione delle voci:
+[docs/VOCABULARY_REVIEW.md](docs/VOCABULARY_REVIEW.md).
+
 ## Test e benchmark
 
 ```sh

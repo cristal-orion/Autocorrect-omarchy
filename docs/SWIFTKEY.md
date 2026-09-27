@@ -208,6 +208,11 @@ Per verificare il nuovo modello con l'ispettore esistente:
 
 ## Prossimo passo utile
 
+La decodifica è in pausa mentre verifichiamo conservazione del vocabolario e
+fattibilità Fcitx. Il primo [confronto senza protezione del vocabolario](VOCABULARY_REVIEW.md)
+ha prodotto 40 proposte baseline e 31 con Hunspell sulle 1.338 forme sconosciute
+normalizzate; i casi attendono revisione prima di contarli come falsi positivi.
+
 Il modello personale è un candidato concreto per inizializzare la memoria
 contestuale. Prima occorre decodificare il vocabolario e verificare orientamento
 delle sequenze, token speciali e significato dei conteggi. Un'eventuale ulteriore
