@@ -102,6 +102,11 @@ non va confrontato con la soglia automatica 100.000 senza una nuova calibrazione
 
 ## Uso nel laboratorio esistente
 
+Aggiornamento del 28 settembre: il [correttore contestuale](CONTEXTUAL_CORRECTION.md)
+legge ora `ngrams.sqlite3` in sola lettura, con cache limitata delle righe, e può
+guidare le sostituzioni nella prova Fcitx con `--context`. Il percorso CLI
+descritto sotto continua a caricare le frasi in RAM.
+
 La CLI sa già caricare frasi, quindi si può provare il solo training:
 
 ```sh

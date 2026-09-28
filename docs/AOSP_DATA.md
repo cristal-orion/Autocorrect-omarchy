@@ -145,6 +145,11 @@ errori per token e suggerimenti per ciascun caso.
 
 ## Criteri della prova LatinIME
 
+**Esito del 28 settembre:** abbiamo completato la prima sessione con una CLI
+Linux funzionante. La configurazione provata non supera i criteri di precisione,
+conservazione dei nomi validi e p95. Risultati e comandi:
+[LATINIME_PROBE.md](LATINIME_PROBE.md). Seguono i criteri fissati prima della prova.
+
 Il prossimo blocco ha un budget massimo di **due sessioni di lavoro**; alla
 fine della prima registreremo ostacoli e parte ancora necessaria. Prima di
 collegarlo a Fcitx richiediamo due verifiche distinte:

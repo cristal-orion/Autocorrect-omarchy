@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "format_version": 1,
+    "split": "development",
+    "scope": "Five user-reported typo cases plus authored diagnostic controls. Used during development; not independent evaluation or representative natural-typing accuracy. csa/callo/pne were added after context-development-final (which contains the earlier 13 cases).",
+    "date": "2026-09-28",
+    "training": "Never added to model counts. The contextual margin is a development choice informed by inspecting the piza candidates."
+  },
+  "cases": [
+    {"task":"correction","previous":"ieri ho mangiato una ","input":"piza","expected":"pizza","category":"user_report","source":"User screenshot; intended pizza inferred from the sentence."},
+    {"task":"correction","previous":"","input":"stao","expected":"stato","category":"user_report","source":"User explicitly provided target stato; previous phrase not supplied."},
+    {"task":"correction","previous":"ti devo dire una ","input":"csa","expected":"cosa","category":"user_report","source":"User screenshot; intended cosa inferred from the sentence. Observed short_word; input has three letters."},
+    {"task":"correction","previous":"di estate al sole fa ","input":"callo","expected":"caldo","category":"user_report","source":"User screenshot; intended caldo inferred from the sentence. Observed known_word; real-word error, currently preserved by policy."},
+    {"task":"correction","previous":"oggi ho mangiato del prosciutto nel ","input":"pne","expected":"pane","category":"user_report","source":"User explicitly supplied this sentence and the candidate pane. Original three-letter input was preserved."},
+    {"task":"correction","previous":"sono ","input":"stao","expected":"stato","category":"authored_context"},
+    {"task":"correction","previous":"io sono ","input":"stao","expected":"stato","category":"authored_context"},
+    {"task":"correction","previous":"comune di ","input":"piza","expected":"pisa","category":"authored_context"},
+    {"task":"correction","previous":"ieri ho mangiato una ","input":"pizza","expected":"pizza","category":"known_word"},
+    {"task":"correction","previous":"comune di ","input":"pisa","expected":"pisa","category":"known_word"},
+    {"task":"correction","previous":"ieri ho mangiato una ","input":"Piza","expected":"Piza","category":"capitalization_guard"},
+    {"task":"correction","previous":"ieri ho mangiato una ","input":"pipa","expected":"pipa","category":"known_word"},
+    {"task":"correction","previous":"per disegnare uso ","input":"manim","expected":"manim","category":"valid_package_name"},
+    {"task":"correction","previous":"ieri ho mangiato una ","input":"polars","expected":"polars","category":"valid_package_name"},
+    {"task":"correction","previous":"ieri ho mangiato una ","input":"marimo","expected":"marimo","category":"valid_package_name"},
+    {"task":"correction","previous":"ieri ho mangiato una ","input":"altair","expected":"altair","category":"valid_package_name"}
+  ]
+}

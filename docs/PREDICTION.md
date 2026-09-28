@@ -1,5 +1,9 @@
 # CLI contestuale interattiva
 
+Per l'apprendimento dai gesti nella finestra Fcitx vedere [LEARNING.md](LEARNING.md).
+Questa pagina descrive la CLI a frasi confermate con Invio; usa una memoria
+distinta dal nuovo database di feedback del bridge.
+
 ## Avvio e tasti
 
 ```sh

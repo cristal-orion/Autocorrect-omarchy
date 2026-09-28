@@ -1,5 +1,6 @@
 // Isolated Fcitx probe: fixed replacements or a bounded request to the real core.
 #include "engine_client.h"
+#include "edit_tracker.h"
 #include <fcitx/addonfactory.h>
 #include <fcitx/addonmanager.h>
 #include <fcitx/candidatelist.h>
@@ -14,14 +15,15 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <functional>
 
 namespace {
 const std::map<std::string, std::string> replacements{
     {"quesot", "questo"}, {"qaundo", "quando"}, {"domnai", "domani"}};
 
-std::string correction(const std::string &token) {
-    if (const auto *socket = std::getenv("AUTOCORRECT_PROBE_ENGINE_SOCKET")) {
-        return queryEngine(socket, token);
+std::string correction(const std::string &token, const std::string &previous = {}) {
+    if (std::getenv("AUTOCORRECT_PROBE_ENGINE_SOCKET")) {
+        return queryEngine(token, previous).output;
     }
     const auto found = replacements.find(token);
     return found == replacements.end() ? token : found->second;
@@ -40,6 +42,13 @@ struct State : fcitx::InputContextProperty {
     bool waitingForSurrounding = false;
     bool bypassWord = false;
     bool suppressNextSpace = false;
+    EditTracker edit;
+    std::string undoPrevious, undoFeedbackId;
+    std::string pendingFeedbackId, pendingOriginal, pendingTarget, pendingPrevious;
+    std::string choiceText, choiceBeforeText, choiceOriginal, choicePrevious;
+    unsigned choiceCursor = 0;
+    bool choiceReady = false;
+    std::vector<std::string> choices;
 
     void clearUndo() {
         original.clear();
@@ -47,7 +56,21 @@ struct State : fcitx::InputContextProperty {
         expectedText.clear();
         expectedCursor = 0;
         waitingForSurrounding = false;
+        undoPrevious.clear();
+        undoFeedbackId.clear();
     }
+};
+
+class FeedbackCandidate : public fcitx::CandidateWord {
+public:
+    FeedbackCandidate(const std::string &text, std::function<void(fcitx::InputContext *)> callback)
+        : CandidateWord(fcitx::Text(text)), callback_(std::move(callback)) {}
+    void select(fcitx::InputContext *ic) const override {
+        auto callback = callback_; // The callback may destroy the candidate list.
+        callback(ic);
+    }
+private:
+    std::function<void(fcitx::InputContext *)> callback_;
 };
 
 bool blocked(fcitx::InputContext *ic) {
@@ -90,6 +113,17 @@ public:
             fcitx::EventWatcherPhase::PostInputMethod, [this](fcitx::Event &event) {
                 auto *ic = static_cast<fcitx::InputContextEvent &>(event).inputContext();
                 auto *state = ic->propertyFor(&factory_);
+                if (blocked(ic) || !ic->hasFocus()) { *state = State{}; return; }
+                if (surroundingUsable(ic)) {
+                    observeEdit(ic, state);
+                    confirmSelection(ic, state, false);
+                    if (!state->choices.empty()) {
+                        const bool matches = ic->surroundingText().text() == state->choiceText
+                            && ic->surroundingText().cursor() == state->choiceCursor;
+                        if (matches) state->choiceReady = true;
+                        else if (state->choiceReady || ic->surroundingText().text() != state->choiceBeforeText) clearChoices(ic, state);
+                    }
+                }
                 // Some clients do not report initially empty surrounding text.
                 // Capture the post-commit snapshot only before any next edit key.
                 if (!state->waitingForSurrounding || blocked(ic) || !surroundingUsable(ic)) {
@@ -113,7 +147,17 @@ public:
 
     void reset(const fcitx::InputMethodEntry &, fcitx::InputContextEvent &event) override {
         auto *ic = event.inputContext();
-        *ic->propertyFor(&factory_) = State{};
+        auto *state = ic->propertyFor(&factory_);
+        // GTK resets its IM around Backspace and caret navigation. Preserve
+        // only a compatible, user-key-driven edit, never an undo/choice.
+        // Focus/field changes and external text changes still invalidate it.
+        const bool preserveEdit = event.type() == fcitx::EventType::InputContextReset
+            && ic->hasFocus() && !blocked(ic) && state->edit.active && surroundingUsable(ic)
+            && state->edit.target(ic->surroundingText().text()).has_value();
+        EditTracker edit;
+        if (preserveEdit) edit = std::move(state->edit);
+        *state = State{};
+        if (preserveEdit) state->edit = std::move(edit);
         ic->inputPanel().reset();
         ic->updatePreedit();
         ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
@@ -152,11 +196,26 @@ public:
         if (key.isModifier()) {
             return;
         }
+        if (!preedit) {
+            confirmSelection(ic, state, true);
+            if (surroundingUsable(ic)) observeEdit(ic, state);
+            for (int i = 0; i < 3; ++i) {
+                if (key.check(static_cast<fcitx::KeySym>(FcitxKey_F1 + i)) && selectChoice(ic, state, i)) {
+                    event.filterAndAccept();
+                    return;
+                }
+            }
+            clearChoices(ic, state);
+        }
         if (key.check(FcitxKey_BackSpace) && !state->original.empty()) {
             if (!state->waitingForSurrounding && surroundingUsable(ic) && ic->surroundingText().text() == state->expectedText &&
                 ic->surroundingText().cursor() == state->expectedCursor) {
                 const auto original = state->original;
+                auto target = state->replacement;
+                if (!target.empty() && target.back() == ' ') target.pop_back();
+                sendFeedback(feedbackId(), "reject", original, target, state->undoPrevious, state->undoFeedbackId);
                 const auto count = fcitx::utf8::length(state->replacement);
+                state->edit.clear();
                 state->clearUndo();
                 ic->deleteSurroundingText(-static_cast<int>(count), count);
                 if (preedit) {
@@ -174,6 +233,31 @@ public:
         }
         state->clearUndo();
         if (!preedit) {
+            if (std::getenv("AUTOCORRECT_PROBE_LEARNING")) {
+                if (key.check(FcitxKey_space) || key.check(FcitxKey_Return)) {
+                    auto observation = state->edit.finish(ic->surroundingText().text(), surroundingUsable(ic) ? cursorByte(ic) : 0);
+                    if (observation && surroundingUsable(ic)) {
+                        sendFeedback(feedbackId(), "manual", observation->original, observation->target, observation->previous);
+                        state->suppressNextSpace = false;
+                        return; // The user's completed edit is not autocorrected again.
+                    }
+                } else {
+                    const bool backspace = key.sym() == FcitxKey_BackSpace;
+                    const bool deletion = backspace || key.check(FcitxKey_Delete);
+                    const auto codePoint = fcitx::Key::keySymToUnicode(key.sym());
+                    const bool typing = codePoint >= 0x21 && !key.hasModifier();
+                    const bool controlBackspace = backspace && key.check(FcitxKey_BackSpace, fcitx::KeyState::Ctrl);
+                    if ((deletion && (!key.hasModifier() || controlBackspace)) || typing) {
+                        if (ic->surroundingText().isValid() && ic->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText)) {
+                            const auto &surrounding = ic->surroundingText();
+                            const auto anchor = fcitx::utf8::ncharByteLength(surrounding.text().begin(), surrounding.anchor());
+                            if (!state->edit.active) state->edit.begin(surrounding.text(), cursorByte(ic), anchor, backspace, deletion);
+                            if (state->edit.active) state->edit.authorize(surrounding.text(), cursorByte(ic), anchor,
+                                backspace, deletion, controlBackspace, typing ? fcitx::Key::keySymToUTF8(key.sym()) : "");
+                        }
+                    } else if (!key.isCursorMove()) state->edit.clear();
+                }
+            }
             if (key.check(FcitxKey_space)) {
                 if (state->suppressNextSpace) {
                     state->suppressNextSpace = false;
@@ -234,6 +318,54 @@ public:
     }
 
 private:
+    void observeEdit(fcitx::InputContext *ic, State *state) {
+        const bool active = state->edit.active;
+        auto observation = state->edit.observe(ic->surroundingText().text(), cursorByte(ic), cursorByte(ic));
+        if (observation) sendFeedback(feedbackId(), "manual", observation->original, observation->target, observation->previous);
+        else if (active && !state->edit.active && std::getenv("AUTOCORRECT_PROBE_TEST")) diagnostic(ic, "edit-discard");
+    }
+
+    void clearChoices(fcitx::InputContext *ic, State *state) {
+        if (state->choices.empty()) return;
+        state->choices.clear();
+        state->choiceReady = false;
+        ic->inputPanel().setCandidateList(nullptr);
+        ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+    }
+
+    void confirmSelection(fcitx::InputContext *ic, State *state, bool cancelIfStale) {
+        if (state->pendingFeedbackId.empty()) return;
+        if (ic->hasFocus() && surroundingUsable(ic) && ic->surroundingText().text() == state->expectedText
+            && ic->surroundingText().cursor() == state->expectedCursor) {
+            const auto id = state->pendingFeedbackId;
+            state->pendingFeedbackId.clear();
+            sendFeedback(id, "selection", state->pendingOriginal, state->pendingTarget, state->pendingPrevious);
+        } else if (cancelIfStale) state->pendingFeedbackId.clear();
+    }
+
+    bool selectChoice(fcitx::InputContext *ic, State *state, int index) {
+        if (blocked(ic) || !ic->hasFocus() || !surroundingUsable(ic) || index < 0 || index >= static_cast<int>(state->choices.size())
+            || ic->surroundingText().text() != state->choiceText || ic->surroundingText().cursor() != state->choiceCursor) return false;
+        const auto output = state->choices[index];
+        const auto original = state->choiceOriginal;
+        const auto previous = state->choicePrevious;
+        clearChoices(ic, state);
+        state->edit.clear();
+        const auto removeBytes = original.size() + 1; // Includes the just-typed space.
+        rememberUndo(ic, state, original, output + " ", removeBytes);
+        state->undoPrevious = previous;
+        state->undoFeedbackId = feedbackId();
+        state->pendingFeedbackId = state->undoFeedbackId;
+        state->pendingOriginal = original;
+        state->pendingTarget = output;
+        state->pendingPrevious = previous;
+        const auto chars = fcitx::utf8::length(original) + 1;
+        ic->deleteSurroundingText(-static_cast<int>(chars), chars);
+        ic->commitString(output + " ");
+        diagnostic(ic, "manual-candidate");
+        return true;
+    }
+
     void rememberUndo(fcitx::InputContext *ic, State *state, const std::string &original,
                       const std::string &output, unsigned removeCount) {
         if (output == original + " ") {
@@ -251,7 +383,7 @@ private:
         if (byte < removeCount) {
             return;
         }
-        const auto removeChars = removeCount ? fcitx::utf8::length(original) : 0;
+        const auto removeChars = removeCount ? fcitx::utf8::length(surrounding.text().substr(byte - removeCount, removeCount)) : 0;
         state->expectedCursor = surrounding.cursor() - removeChars + fcitx::utf8::length(output);
         state->expectedText = surrounding.text();
         state->expectedText.replace(byte - removeCount, removeCount, output);
@@ -275,12 +407,43 @@ private:
             return;
         }
         const auto original = text.substr(start, cursor - start);
-        const auto output = correction(original);
+        // Bound the prefix in bytes, then advance to a whitespace boundary:
+        // no partial UTF-8 code point or truncated word enters the tokenizer.
+        auto contextStart = start > 1024 ? start - 1024 : 0;
+        while (contextStart && contextStart < start && !separator(text[contextStart - 1])) {
+            ++contextStart;
+        }
+        const auto previous = text.substr(contextStart, start - contextStart);
+        const auto reply = std::getenv("AUTOCORRECT_PROBE_ENGINE_SOCKET") ? queryEngine(original, previous)
+            : EngineReply{correction(original), {}, false};
+        const auto &output = reply.output;
         if (output == original) {
+            if (reply.suggestionsEnabled && !reply.candidates.empty()) {
+                state->choices = reply.candidates;
+                state->choiceOriginal = original;
+                state->choicePrevious = previous;
+                state->choiceBeforeText = text;
+                state->choiceText = text;
+                state->choiceText.insert(cursor, " ");
+                state->choiceCursor = ic->surroundingText().cursor() + 1;
+                state->choiceReady = false;
+                auto list = std::make_unique<fcitx::CommonCandidateList>();
+                list->setSelectionKey({fcitx::Key(FcitxKey_F1), fcitx::Key(FcitxKey_F2), fcitx::Key(FcitxKey_F3)});
+                for (size_t i = 0; i < state->choices.size(); ++i) {
+                    list->append<FeedbackCandidate>(state->choices[i], [this, i](fcitx::InputContext *context) {
+                        selectChoice(context, context->propertyFor(&factory_), i);
+                    });
+                }
+                list->setLayoutHint(fcitx::CandidateLayoutHint::Horizontal);
+                ic->inputPanel().setCandidateList(std::move(list));
+                ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+            }
             return;
         }
+        state->edit.clear();
         const auto count = fcitx::utf8::length(original);
         rememberUndo(ic, state, original, output + " ", original.size());
+        state->undoPrevious = previous;
         ic->deleteSurroundingText(-static_cast<int>(count), count);
         ic->commitString(output + " ");
         diagnostic(ic, "correct-surrounding");

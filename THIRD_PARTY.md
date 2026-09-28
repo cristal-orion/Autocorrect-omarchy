@@ -66,3 +66,31 @@ gli obblighi del codice o dei dati riutilizzati.
 HeliBoard dichiara GPL-3.0 per il progetto e mantiene componenti AOSP Apache-2.0.
 In questo blocco abbiamo consultato il fork per individuare le API; non abbiamo
 importato sorgenti, APK o librerie native di HeliBoard/LatinIME.
+
+### Prova nativa del 28 settembre 2026
+
+Il builder `scripts/build-latinime-probe.py` acquisisce e compila:
+
+- **AOSP LatinIME**, revisione `127336e9f29d69607eab55982324b210279ae8c5`,
+  <https://android.googlesource.com/platform/packages/inputmethods/LatinIME/>.
+  Usa gli 82 `.cpp` del gruppo `LATIN_IME_CORE_SRC_FILES` in `native/jni/Android.bp`
+  e i relativi header. Il gruppo dichiara Apache-2.0; il checkout include `NOTICE`
+  con il testo della licenza. Il core resta senza modifiche.
+- **AOSP libnativehelper**, revisione `aef2939781fc0b57b4477df7160935cdf5697919`,
+  <https://android.googlesource.com/platform/libnativehelper/>. Usa solo
+  `include_jni/jni.h`, con intestazione Apache-2.0; conserva anche il `NOTICE`
+  del checkout. L'adattatore host usa gli array senza caricare una JVM.
+- **json-c** di sistema per il protocollo JSON del processo nativo. Il builder
+  usa `pkg-config` e registra la versione nel manifest; json-c usa licenza MIT.
+
+Il percorso predefinito dei checkout è `build/latinime-probe/vendor/`, escluso
+da Git, insieme al binario. Il manifest registra revisioni e checksum dei file
+usati, inclusi gli avvisi `NOTICE`. Per ridistribuire il binario occorre
+accompagnarlo con gli avvisi e le licenze delle dipendenze.
+
+I dizionari nativi derivano dalla wordlist Helium314 descritta sopra; il manifest
+dei dati esplicita la normalizzazione e la trasformazione sperimentale dei
+ranghi bigramma. Codici e ranghi non diventano conteggi attraverso la compilazione.
+Il codice FUTO consultato resta fuori dalla build. La sua licenza di progetto
+è FUTO Source First 1.1-kb, distinta da quella dei sorgenti AOSP qui selezionati.
+Dettagli della prova: [docs/LATINIME_PROBE.md](docs/LATINIME_PROBE.md).

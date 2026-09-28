@@ -7,6 +7,20 @@ decisione esplicita: correggere oppure conservare l'input.
 Stato corrente, risultati della prova manuale e prossime priorità:
 [docs/STATUS.md](docs/STATUS.md).
 
+### Prova attuale con apprendimento personale
+
+```sh
+python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core \
+  --context --frequency 5000 --learn
+```
+
+Correggere una parola con Backspace/riscrittura o inserendo la lettera mancante,
+poi terminare con spazio: il pannello conferma l'apprendimento. Una coppia come
+`pne → pane` può funzionare anche in frasi diverse e dopo il riavvio. Alt+L
+sospende la memoria; Alt+D permette di dimenticare un typo. I suggerimenti
+selezionabili sono opzionali (Alt+S), disabilitati all'avvio.
+Regole, file della memoria e verifiche: [docs/LEARNING.md](docs/LEARNING.md).
+
 ## Avvio rapido
 
 Richiede Python 3.10+ con `venv` e accesso a Internet per il setup iniziale:
@@ -56,6 +70,11 @@ soglie automatiche del core.
 Per preparare conteggi completi da un primo corpus italiano di notizie, vedere
 [docs/LEIPZIG_CORPUS.md](docs/LEIPZIG_CORPUS.md). Lo sweep della frequenza a margine
 fisso è in [docs/FREQUENCY_SWEEP.md](docs/FREQUENCY_SWEEP.md).
+
+È disponibile anche una [CLI LatinIME nativa per Linux](docs/LATINIME_PROBE.md).
+La prima prova corregge più typo, ma la precisione scende al 93,52% rispetto
+al 98,63% della baseline; il p95 nativo sui typo è 17,88 ms. La guida contiene
+build, comandi, confronto a lessico condiviso e limiti della politica sperimentale.
 
 ### Correzione di token singoli
 
@@ -192,6 +211,24 @@ Backspace annulla l'ultima correzione. Il bridge reale ha superato 16 controlli
 Qt e 9 GTK; dettagli e limiti nella [guida Fcitx](docs/FCITX_PROBE.md).
 Il pannello diagnostico mostra anche il motivo delle astensioni e i candidati;
 la prova Qt aggiornata comprende 17 controlli di integrazione superati.
+
+La finestra Qt permette ora di confrontare **frequenza minima 100.000 e 5.000**
+con due pulsanti (Alt+1 / Alt+5), oppure inserire una soglia con Alt+F. Per questa
+prova lasciare il margine a 1,30. La diagnostica mostra la frequenza dei candidati
+e le soglie effettive. Ultima verifica: **35 controlli Qt e 9 GTK superati**.
+
+Per provare anche il **contesto Leipzig** e i typo da tre lettere:
+
+```sh
+python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core --context --frequency 5000
+```
+
+Alt+C attiva o disattiva il contesto. Nella prova `una piza` diventa `una pizza`
+e `sono stao` diventa `sono stato`. Su 1.000 typo sintetici in frasi di sviluppo
+le correzioni giuste salgono da 575 a 731, con gli stessi 2 errori. La modalità
+recupera anche `ti devo dire una csa → cosa` e `prosciutto nel pne → pane` con
+regole dedicate alle tre lettere. Ha superato 62 controlli Qt e 15 GTK; politica e limiti in
+[docs/CONTEXTUAL_CORRECTION.md](docs/CONTEXTUAL_CORRECTION.md).
 
 ## Recupero dell'input
 

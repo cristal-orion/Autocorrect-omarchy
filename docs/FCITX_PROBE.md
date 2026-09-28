@@ -6,6 +6,36 @@ isolata e aggiunge un campo multilinea.
 
 ## Prova con motore reale e testo multilinea
 
+Per la prova attuale con **memoria personale persistente**, aggiungere `--learn`:
+
+```sh
+python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core --context --frequency 5000 --learn
+```
+
+La finestra **Autocorrect - apprendimento personale** registra correzioni manuali
+e scelte esplicite. Alt+L sospende la memoria, Alt+D dimentica un typo, Alt+S
+abilita i candidati opzionali. I popup partono disabilitati. Uso, regole e
+35 controlli di apprendimento per ciascun toolkit: [LEARNING.md](LEARNING.md).
+
+Per il nuovo percorso con **contesto Leipzig e frequenza 5.000**:
+
+```sh
+python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core --context --frequency 5000
+```
+
+La finestra si chiama **Autocorrect - contesto Leipzig, da 3 lettere**.
+Alt+C abilita o disabilita il contesto per le parole successive. Prova
+`ieri ho mangiato una piza ` e `sono stao `: il correttore propone `pizza` e
+`stato`. Per le quattro lettere applica una soglia contestuale dedicata,
+mostrata nel pannello insieme al margine baseline. Politica, limiti e misure:
+[CONTEXTUAL_CORRECTION.md](CONTEXTUAL_CORRECTION.md). Questa modalità ha superato
+**62 controlli Qt e 15 GTK**. L'estensione alle tre lettere recupera anche
+`ti devo dire una csa → cosa` e `prosciutto nel pne → pane`, con evidenza più
+restrittiva. Il pannello distingue il trigramma esatto dai conteggi aggregati
+per famiglie di articoli.
+
+Per la modalità base a singolo token:
+
 ```sh
 bash scripts/build-fcitx-probe.sh
 python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core
@@ -18,7 +48,8 @@ ripristina l'originale. Il motore conserva parole note, parole Hunspell, maiusco
 e casi che non superano le soglie del core.
 
 Sotto il paragrafo compare l'ultima analisi del motore: token, output proposto,
-motivo, primi tre candidati e margine rispetto alla soglia. `ambiguous` significa
+motivo, primi tre candidati con distanza e frequenza, margine e frequenza minima
+usati nella decisione. `ambiguous` significa
 che il margine non basta; `known_word` indica una voce della lista di frequenze;
 `valid_word` indica il riconoscimento Hunspell. La diagnostica riporta una
 decisione del motore, non una conferma che l'applicazione l'abbia applicata:
@@ -34,17 +65,62 @@ Alt+T riporta al paragrafo. Il nuovo valore vale per i token successivi, senza
 ricorreggere il testo già scritto. L'ultima analisi mostra il margine effettivamente
 usato dal motore; `1.300` indica 1,3, non milletrecento.
 
-Il valore è salvato atomicamente in `settings.json` (0600) nella sola sessione
-isolata. Il server lo legge prima della decisione; file assenti, incompleti o
-valori non validi conservano l'ultima politica valida. Una nuova sessione riparte
-da 1,30. Le altre soglie e protezioni continuano ad applicarsi. GTK usa il valore
-iniziale; questo controllo grafico è disponibile in Qt.
+La finestra salva margine e frequenza insieme, con rinomina atomica, in
+`settings.json` (0600) nella sola sessione isolata. Il server legge il file prima
+della decisione e valida entrambi i valori prima di applicarli. Con file assenti,
+incompleti o valori non validi conserva l'ultima politica valida. Una nuova
+sessione riparte da margine 1,30 e frequenza minima 100.000. GTK usa i valori
+iniziali; i controlli grafici sono disponibili in Qt.
 
 Verifica del controllo: **22 controlli Qt superati**, inclusi `domnai` conservato
 a 1,30 e corretto in `domani` a 1,00, diagnostica del valore effettivo, annullamento
 seguito da spazio e ripristino della soglia. Sei test Python del server verificano
 anche il rifiuto dei valori non validi. Report:
 `build/fcitx-probe-sessions/qt-surrounding-knym_bpv/report.json`.
+
+### Frequenza regolabile e confronto sul testo reale
+
+Dal 28 settembre la finestra offre **Frequenza minima** (Alt+F), tra 1.000 e
+100.000. Le frecce variano il valore di 1.000; per digitare un valore usare
+Ctrl+A nel campo e confermare con Invio o lasciare il campo. I pulsanti
+**100.000 (baseline)** (Alt+1) e **Prova 5.000** (Alt+5) permettono il confronto
+rapido. Alt+T riporta al paragrafo. La modifica vale dalla prossima parola.
+
+Per la prova manuale lasciare **Margine minimo a 1,30**:
+
+1. A frequenza 100.000, digitare `maglioner `, compreso lo spazio. Il core
+   conserva il token e mostra `low_frequency`: il candidato `maglione` ha
+   frequenza 44.882.
+2. Premere **Prova 5.000**, tornare al paragrafo e digitare di nuovo la parola.
+   Il core propone `maglione`; la diagnostica conferma la frequenza minima usata.
+   Il testo scritto prima del cambio di soglia resta com'era.
+3. Premere Backspace dopo la correzione per annullarla. Lo spazio successivo
+   conserva l'originale. Per una nuova prova, cancellare e riscrivere la parola.
+4. Provare frasi proprie, anche con nomi e termini tecnici. Copiare dal pannello
+   i casi mancati o sbagliati usando questo schema:
+
+   ```text
+   Frase / parola digitata:
+   Risultato atteso:
+   Risultato ottenuto:
+   Frequenza minima e margine:
+   Motivo e candidati mostrati:
+   ```
+
+`domnai` resta ambiguo a margine 1,30 anche abbassando la frequenza; `proggeto`
+resta oltre la distanza automatica. Questi casi aiutano a distinguere i blocchi
+della politica. I confronti su sviluppo a frequenza 5.000 sono in
+[FREQUENCY_SWEEP.md](FREQUENCY_SWEEP.md); serve ancora la prova su testo naturale.
+
+Verifiche aggiornate: **35 controlli Qt, 9 GTK e 105 test Python superati**.
+I 10 test del server coprono anche aggiornamenti atomici, tipi e intervalli
+non validi, compatibilità con aggiornamenti di un solo campo e filtro Hunspell.
+La prova Qt verifica pulsanti, inserimento numerico, diagnostica, annullamento,
+ripristino e conservazione della frequenza quando si modifica il margine.
+Report:
+
+- `build/fcitx-probe-sessions/qt-surrounding-2i8_463n/report.json`
+- `build/fcitx-probe-sessions/gtk-surrounding-jxsey48x/report.json`
 
 ### Interpretazione della prova
 
@@ -75,11 +151,15 @@ Il server Python carica il motore una volta. L'addon C++ gli invia il token
 tramite un socket Unix privato, con messaggi separati per richiesta. Il client
 assegna un budget di 50 ms all'attesa sul socket; errori, risposte non coerenti
 o assenza del server lasciano passare lo spazio con il testo originale. Il
-server non apprende. Il launcher abilita un file locale `decision.json` con
+server usa `FeedbackMemory` quando si richiede `--learn`. Il launcher abilita
+un file locale `decision.json` con
 l'ultima analisi per il pannello; il server lo pubblica dopo aver risposto sul
 socket. Il file ha permessi `0600` e sostituisce l'analisi precedente. I file di
 stato della finestra contengono il testo della prova, sotto la cartella di
 sessione ignorata da Git. I log testuali del server non contengono i token.
+Con apprendimento attivo, `feedback.json` contiene l'ultimo esito del feedback;
+il database persistente conserva gli eventi riconosciuti. I dettagli sono in
+[LEARNING.md](LEARNING.md).
 
 Il bridge gestisce una sequenza finale di `,.!?;:` dopo un token alfabetico,
 conservandola nella sostituzione. Tratta URL, percorsi e stringhe strutturate
@@ -89,7 +169,8 @@ Limiti dell'interazione attuale:
 
 - La correzione parte allo **spazio**, non a Invio o alla sola punteggiatura.
 - Incollare un paragrafo non avvia una revisione retroattiva di tutte le parole.
-- Il modello contestuale della CLI non determina le sostituzioni in questa prova.
+- La modalità `--context` usa il nuovo correttore SQLite Leipzig; il predittore
+  della CLI interattiva resta separato.
 - Il bridge reale è disponibile in modalità `surrounding`, senza popup.
 - La richiesta breve è sincrona nel processo Fcitx; un adapter destinato all'uso
   continuativo richiederà ulteriori misure di latenza e valutazione del trasporto.

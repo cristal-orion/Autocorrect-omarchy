@@ -1,14 +1,14 @@
 # Autocorrect Omarchy: stato del progetto
 
-Aggiornamento: 27 settembre 2026.
+Aggiornamento: 28 settembre 2026.
 Cartella: `/home/michele/Projects/autocorrect`.
 Repository: https://github.com/cristal-orion/Autocorrect-omarchy
 
 ## Punto centrale emerso dalla prova manuale
 
-**Il meccanismo Fcitx di sostituzione allo spazio e annullamento funziona nelle
-finestre di prova. La qualità dell'autocorrezione sul testo quotidiano è ancora
-insufficiente: molte parole con typo rimangono invariate.**
+**A frequenza minima 5.000 l'utente riferisce che quasi tutto funziona bene.
+I casi rimasti includono parole corte e candidati ordinati male. Ora il
+laboratorio Fcitx offre anche il contesto Leipzig, attivabile per la prova.**
 
 L'utente ha confermato il buon comportamento meccanico, poi ha scritto frasi
 libere e osservato molte correzioni mancate. Abbiamo verificato che quei token
@@ -16,11 +16,60 @@ raggiungono il motore: spesso il core si astiene per ambiguità, oppure conserva
 una voce già presente nel dizionario. Gli esempi favorevoli usati nei test
 dimostrano il collegamento, non l'affidabilità o la copertura nell'uso reale.
 
-Il prossimo lavoro deve concentrarsi sulla scelta dei candidati e sul contesto,
-con dati adeguati e valutazione separata. Abbassare soltanto il margine può
-trasformare un'astensione in una correzione grammaticalmente sbagliata.
+I casi `stao → stato` e `una piza → una pizza` hanno guidato il nuovo blocco
+contestuale. Il prossimo lavoro è provarlo su nuove frasi naturali: la scelta
+dei parametri ha usato esempi e risultati di sviluppo, non valutazione indipendente.
 
 ## Aggiornamenti successivi al riepilogo iniziale
+
+- **Apprendimento personale nel bridge Fcitx:** avvio con `--learn`, memoria
+  locale persistente in `~/.local/share/autocorrect/feedback.sqlite3` (rispetta
+  XDG_DATA_HOME). Impara da modifiche manuali alla stessa parola e scelte esplicite;
+  `pne → pane` si trasferisce a frasi nuove e riavvii. Le autocorrezioni non
+  aggiungono conferme; `cane → pane` registra solo uso contestuale. Backspace
+  immediato registra il rifiuto. Alt+L sospende la memoria, Alt+D dimentica,
+  Alt+S abilita i candidati opzionali. **35 controlli Qt e 35 GTK** verificano
+  anche password/NoPredictiveText e dimenticanza dopo riavvio. Dettagli:
+  [LEARNING.md](LEARNING.md). Prossimo blocco: backoff unificato e modello degli
+  errori, come concordato, per migliorare anche i typo mai corretti prima.
+
+- **Typo di tre lettere:** verificati nella finestra `ti devo dire una csa → cosa`
+  e `oggi ho mangiato del prosciutto nel pne → pane`. Il primo usa il trigramma
+  esatto; il secondo un ripiego per vocali interne mancanti basato su famiglie
+  di articoli. Su 500 typo corti di sviluppo recupera 56 correzioni senza errori;
+  conserva 144 controlli di parole corte valide. Le soglie sono state scelte
+  sullo sviluppo. **62 controlli Qt, 15 GTK e 120 test Python superati**.
+  Report: `benchmark-results/context-three-letters-v2/report.json`.
+  [CONTEXTUAL_CORRECTION.md](CONTEXTUAL_CORRECTION.md) descrive regole e limiti.
+
+- **Contesto Leipzig nel bridge Fcitx:** avvio con `--context --frequency 5000`,
+  interruttore Qt Alt+C. Recupera astensioni, con una politica dedicata alle
+  quattro lettere. Verificati `una piza → una pizza` e `sono stao → sono stato`.
+  Su 1.000 nuovi typo sintetici in frasi Leipzig di sviluppo passa da 575 a
+  728 correzioni giuste, mantenendo 2 errori; nessuna modifica alle 1.000 parole
+  sorgenti corrette. Sono risultati di sviluppo. p95 del correttore sulle
+  richieste contestuali di quel campione: 6,38 ms. **50 controlli Qt e 12 GTK
+  superati**. Politica, limiti e comandi: [CONTEXTUAL_CORRECTION.md](CONTEXTUAL_CORRECTION.md).
+
+- **Frequenza regolabile nella finestra Fcitx Qt:** campo Alt+F e pulsanti
+  100.000 (Alt+1) / 5.000 (Alt+5), con margine iniziale 1,30 e Hunspell attivo.
+  La diagnostica mostra frequenze dei candidati e soglie usate. Verificati
+  `maglioner → maglione` a 5.000, annullamento e ripristino a 100.000:
+  **35 controlli Qt e 9 GTK superati**. La finestra è pronta per raccogliere
+  casi da testo naturale. Istruzioni: [FCITX_PROBE.md](FCITX_PROBE.md).
+
+- **Prova LatinIME nativa completata il 28 settembre:** CLI Linux con dizionari
+  italiani v403, candidati e contesto, senza runtime Android/Java. Sullo sviluppo
+  la politica di prova applica 4.347 correzioni giuste e 301 sbagliate: precisione
+  93,52%, copertura 68,44%. SymSpell a frequenza 5.000 ottiene 3.430 giuste e
+  37 sbagliate. LatinIME cambia 3/24 nomi di pacchetti contro 1/24 e ha p95 nativo
+  sui typo 17,88 ms. A parità di lessico/codici il ranking non migliora. La prova
+  non supera i criteri per il collegamento a Fcitx. Comandi, dati e decisione:
+  [LATINIME_PROBE.md](LATINIME_PROBE.md).
+- L'esame di FUTO ha confermato l'interesse del motore ibrido, ma il modello
+  neurale incluso supporta l'inglese. Per la prova abbiamo usato il core AOSP
+  Apache-2.0. Priorità consigliata: frequenza SymSpell 5.000 su testo naturale
+  e contesto con i conteggi Leipzig.
 
 - Preparato l'archivio ufficiale Leipzig `ita_news_2023_100K`: 105.798 segmenti
   di training, 13.010 di sviluppo e 13.313 riservati alla valutazione, con
@@ -44,9 +93,10 @@ trasformare un'astensione in una correzione grammaticalmente sbagliata.
   le frequenze baseline lascia invariate le correzioni giuste e sbagliate.
 - La CLI può provare i dati con `--aosp-wordlist FILE`. Nei 24 casi diagnostici
   costruiti, i nuovi pesi aiutano alcuni typo; i bigrammi troncati non bastano
-  per la previsione colloquiale desiderata. Non abbiamo ancora portato LatinIME
-  o collegato il contesto a Fcitx. Risultati e criteri: [AOSP_DATA.md](AOSP_DATA.md).
-- Suite Python aggiornata: **92 test superati**.
+  per la previsione colloquiale desiderata. Il nuovo percorso Fcitx usa invece
+  i conteggi Leipzig. Risultati e criteri: [AOSP_DATA.md](AOSP_DATA.md).
+- Suite aggiornata: **134 test superati**. I 9 controlli del laboratorio
+  LatinIME passano anche con AddressSanitizer e UndefinedBehaviorSanitizer.
 
 ## Obiettivo
 
@@ -109,14 +159,19 @@ generale dell'italiano. `--corpus FILE` permette di usare frasi UTF-8 proprie;
 predefinita è `~/.local/share/autocorrect/personal-ngrams.sqlite3`, rispettando
 `XDG_DATA_HOME`.
 
-**Il ranking contestuale di questa CLI non guida ancora le sostituzioni Fcitx.**
-Il bridge Fcitx attuale interroga il core su una parola alla volta.
+Questa CLI interattiva resta un laboratorio separato. Per le sostituzioni Fcitx
+abbiamo aggiunto `ContextualCorrector`: usa conteggi Leipzig in SQLite e il
+testo precedente ricevuto dal bridge. Si abilita con `--context` nel launcher;
+la modalità base continua a usare la sola parola.
 
 ## Prova Fcitx disponibile
 
 ```sh
 bash scripts/build-fcitx-probe.sh
 python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core
+
+# Prova attuale, con contesto e soglia 5.000
+python scripts/run-fcitx-probe.py --client qt --mode surrounding --engine core --context --frequency 5000 --learn
 ```
 
 La finestra **Autocorrect - testo reale e diagnostica** offre un campo multilinea
@@ -212,8 +267,8 @@ leggibile/binaria da OneDrive → Apps → SwiftKey. La decodifica è ora in pau
 
 1. Raccogliere e classificare correzioni mancate e indesiderate su testo naturale,
    distinguendo riconoscimento lessicale, ranking e problemi di integrazione.
-2. Migliorare selezione e astensione sullo sviluppo; introdurre il contesto con
-   un corpus italiano adeguato, distinto dai casi usati per valutarlo.
+2. Unificare backoff e modello degli errori per migliorare il primo typo e ridurre
+   le discontinuità delle soglie; mantenere separata la valutazione dalla taratura.
 3. Revisionare il vocabolario personale prima di proteggere nuove voci.
 4. Verificare il trasporto Fcitx nelle applicazioni quotidiane, oltre ai widget
    di prova, prima dell'attivazione ordinaria.
@@ -221,7 +276,9 @@ leggibile/binaria da OneDrive → Apps → SwiftKey. La decodifica è ora in pau
 
 ## Git e recupero
 
-I blocchi di codice sono committati localmente. Commit principali:
+Il repository raccoglie anche la prova LatinIME, la frequenza live Fcitx,
+il ranking contestuale e l'apprendimento personale del 28 settembre, con
+verifiche e documentazione completate. Commit principali precedenti:
 
 - `c7ceb03`: prototipo standalone e benchmark iniziali.
 - `a43c0ce`: Hunspell, CLI contestuale e ispezione SwiftKey.
@@ -231,7 +288,7 @@ I blocchi di codice sono committati localmente. Commit principali:
 - `ea86018`: diagnostica delle astensioni nella finestra Fcitx.
 
 Regola concordata: commit locale dopo ogni blocco verificato; push su richiesta
-separata. Non abbiamo eseguito push in questa sessione. Il PDF di riferimento
+separata. Il PDF di riferimento
 resta non tracciato; dati personali, build e report locali sono esclusi dai commit.
 
 Recupero già predisposto: snapshot Snapper root #6 e backup separato delle
