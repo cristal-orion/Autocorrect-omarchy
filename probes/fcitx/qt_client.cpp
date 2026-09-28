@@ -15,7 +15,7 @@
 #include <QMap>
 #include <QPlainTextEdit>
 #include <QPushButton>
-#include <QSaveFile>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QTextEdit>
 #include <QTimer>
@@ -37,6 +37,7 @@ int main(int argc, char **argv) {
     app.setApplicationName("autocorrect-probe-qt");
     QWidget window;
     const bool realEngine = !qEnvironmentVariable("AUTOCORRECT_PROBE_ENGINE_SOCKET").isEmpty();
+    const bool sharedEngine = !qEnvironmentVariable("AUTOCORRECT_PROBE_SHARED_ENGINE").isEmpty();
     window.setWindowTitle(realEngine ? "Autocorrect - testo reale e diagnostica" : "Autocorrect Fcitx Probe Qt");
     auto *layout = new QVBoxLayout(&window);
     auto *instructions = new QLabel(realEngine
@@ -138,10 +139,15 @@ int main(int argc, char **argv) {
             "Correggi una parola con Backspace o modificandola al suo interno, poi premi spazio per imparare. "
             "La memoria resta dopo il riavvio. I suggerimenti sono opzionali.");
     }
+    if (sharedEngine) {
+        window.setWindowTitle("Autocorrect - prova con pannello Omarchy");
+        instructions->setText("Prova collegata al pannello Omarchy nella barra.\n"
+            "Spazio corregge; Backspace annulla. Contesto, memoria e soglie si regolano dal pannello.");
+    }
     auto *policyStatus = new QLabel("Soglie valide dalla prossima parola, solo in questa sessione. "
         "Per confrontare le frequenze lascia il margine a 1,30. Hunspell attivo nel launcher core.", &window);
     policyStatus->setWordWrap(true);
-    if (realEngine && !settingsPath.isEmpty()) {
+    if (realEngine && !settingsPath.isEmpty() && !sharedEngine) {
         auto *controls = new QHBoxLayout;
         controls->addWidget(marginLabel);
         controls->addWidget(margin);
@@ -165,25 +171,22 @@ int main(int argc, char **argv) {
             layout->addWidget(learningStatus);
         }
         layout->addWidget(policyStatus);
-        auto saveSettings = [=] {
-            QSaveFile file(settingsPath);
-            const auto bytes = QJsonDocument(QJsonObject{{"min_score_margin", margin->value()},
-                {"min_frequency", frequency->value()}, {"use_context", contextToggle->isChecked()},
-                {"learn_enabled", learningToggle->isChecked()}, {"suggestions_enabled", suggestionsToggle->isChecked()}}).toJson();
-            const bool saved = file.open(QIODevice::WriteOnly)
-                && file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)
-                && file.write(bytes) == bytes.size() && file.commit();
+        auto saveSettings = [=](const QString &key, const QJsonValue &value) {
+            const auto bytes = QJsonDocument(QJsonObject{{"op", "configure"}, {"changes", QJsonObject{{key, value}}}}).toJson(QJsonDocument::Compact);
+            const auto socket = qEnvironmentVariable("AUTOCORRECT_PROBE_ENGINE_SOCKET").toUtf8();
+            const auto raw = sendProbePacket(socket.constData(), std::string(bytes.constData(), bytes.size()));
+            const bool saved = QJsonDocument::fromJson(QByteArray::fromStdString(raw)).object()["configured"].toBool();
             policyStatus->setText(saved
                 ? QString("Salvato per i prossimi token: frequenza %1, margine %2. "
                           "L'ultima analisi mostra le soglie effettivamente usate dal motore.")
                     .arg(italian.toString(frequency->value())).arg(italian.toString(margin->value(), 'f', 2))
-                : "Errore di salvataggio: il motore conserva le soglie precedenti.");
+                : "Aggiornamento non confermato dal motore. Controlla le soglie nell'ultima analisi.");
         };
-        QObject::connect(margin, &QDoubleSpinBox::valueChanged, [=](double) { saveSettings(); });
-        QObject::connect(frequency, &QSpinBox::valueChanged, [=](int) { saveSettings(); });
-        QObject::connect(contextToggle, &QCheckBox::toggled, [=](bool) { saveSettings(); });
-        QObject::connect(learningToggle, &QCheckBox::toggled, [=](bool) { saveSettings(); });
-        QObject::connect(suggestionsToggle, &QCheckBox::toggled, [=](bool) { saveSettings(); });
+        QObject::connect(margin, &QDoubleSpinBox::valueChanged, [=](double value) { saveSettings("min_score_margin", value); });
+        QObject::connect(frequency, &QSpinBox::valueChanged, [=](int value) { saveSettings("min_frequency", value); });
+        QObject::connect(contextToggle, &QCheckBox::toggled, [=](bool value) { saveSettings("use_context", value); });
+        QObject::connect(learningToggle, &QCheckBox::toggled, [=](bool value) { saveSettings("learn_enabled", value); });
+        QObject::connect(suggestionsToggle, &QCheckBox::toggled, [=](bool value) { saveSettings("suggestions_enabled", value); });
         QObject::connect(resetMargin, &QPushButton::clicked, [=] { margin->setValue(1.3); });
         QObject::connect(baselineFrequency, &QPushButton::clicked, [=] { frequency->setValue(100000); });
         QObject::connect(trialFrequency, &QPushButton::clicked, [=] { frequency->setValue(5000); });
@@ -198,10 +201,11 @@ int main(int argc, char **argv) {
         contextToggle->hide();
         policyStatus->hide();
     }
-    if (!hasLearning) {
+    if (!hasLearning || sharedEngine) {
         learningToggle->hide(); suggestionsToggle->hide(); forgetWord->hide();
         forgetLabel->hide(); forgetButton->hide(); learningStatus->hide();
     }
+    if (sharedEngine && hasLearning) { layout->addWidget(learningStatus); learningStatus->show(); }
     auto forget = [=] {
         const auto word = forgetWord->text().trimmed();
         if (word.isEmpty()) return;
@@ -217,6 +221,7 @@ int main(int argc, char **argv) {
     QObject::connect(forgetWord, &QLineEdit::returnPressed, forget);
     const QMap<QString, QString> explanations{
         {"ambiguous", "Margine insufficiente fra i candidati: conserva l'originale"},
+        {"paused", "Correttore in pausa dal pannello"},
         {"known_word", "Voce presente nella lista di frequenze"},
         {"valid_word", "Forma riconosciuta da Hunspell"},
         {"high_margin", "Propone una correzione: soglie superate"},
@@ -251,6 +256,17 @@ int main(int argc, char **argv) {
     qint64 lastFeedbackTime = 0;
     QTimer timer;
     QObject::connect(&timer, &QTimer::timeout, [&] {
+        QFile settingsFile(settingsPath);
+        if (!settingsPath.isEmpty() && settingsFile.open(QIODevice::ReadOnly)) {
+            const auto values = QJsonDocument::fromJson(settingsFile.readAll()).object();
+            const QSignalBlocker blockMargin(margin), blockFrequency(frequency), blockContext(contextToggle),
+                blockLearning(learningToggle), blockSuggestions(suggestionsToggle);
+            if (values.contains("min_score_margin") && !margin->hasFocus()) margin->setValue(values["min_score_margin"].toDouble());
+            if (values.contains("min_frequency") && !frequency->hasFocus()) frequency->setValue(values["min_frequency"].toInt());
+            if (values.contains("use_context")) contextToggle->setChecked(values["use_context"].toBool());
+            if (values.contains("learn_enabled")) learningToggle->setChecked(values["learn_enabled"].toBool());
+            if (values.contains("suggestions_enabled")) suggestionsToggle->setChecked(values["suggestions_enabled"].toBool());
+        }
         if (!diagnosticsPath.isEmpty()) {
             QFile diagnosticFile(diagnosticsPath);
             if (diagnosticFile.open(QIODevice::ReadOnly)) {

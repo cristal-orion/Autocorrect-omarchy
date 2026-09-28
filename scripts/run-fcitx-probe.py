@@ -620,6 +620,7 @@ def main():
     parser.add_argument("--learn", action="store_true", help="Apprende gesti espliciti nella memoria personale persistente")
     parser.add_argument("--memory", type=Path, help="Memoria feedback alternativa; --test usa una memoria nuova nella sessione")
     parser.add_argument("--candidates", action="store_true", help="Suggerimenti selezionabili opzionali, solo nelle astensioni; richiede --learn")
+    parser.add_argument("--shared-engine", action="store_true", help="Usa il motore utente gestito dal pannello Omarchy")
     args = parser.parse_args()
     if not 1000 <= args.frequency <= 100000 or (args.engine != "core" and (args.context or args.frequency != 100000)):
         parser.error("Contesto e frequenza richiedono --engine core; frequenza ammessa: 1000..100000.")
@@ -629,6 +630,8 @@ def main():
         parser.error("L'apprendimento richiede --engine core; memoria e candidati richiedono --learn.")
     if args.test and args.memory:
         parser.error("Il test usa una memoria isolata e non accetta --memory.")
+    if args.shared_engine and (args.engine != "core" or args.test or args.memory or args.learn or args.context or args.candidates or args.frequency != 100000):
+        parser.error("--shared-engine richiede --engine core e usa le impostazioni del pannello; non accetta test o override locali.")
     binary = ROOT / "build/fcitx-probe" / f"autocorrect-probe-{args.client}"
     library = ROOT / "build/fcitx-probe/libautocorrectprobe.so"
     if not binary.exists() or not library.exists():
@@ -677,6 +680,7 @@ def main():
     env.pop("AUTOCORRECT_PROBE_CONTEXT_CORPUS", None)
     env.pop("AUTOCORRECT_PROBE_LEARNING", None)
     env.pop("AUTOCORRECT_PROBE_CANDIDATES", None)
+    env.pop("AUTOCORRECT_PROBE_SHARED_ENGINE", None)
     env["AUTOCORRECT_PROBE_INITIAL_FREQUENCY"] = str(args.frequency)
     if args.test:
         env["AUTOCORRECT_PROBE_TEST"] = "1"
@@ -685,7 +689,28 @@ def main():
     print(f"Sessione isolata: {session}", flush=True)
     try:
         core = None
-        if args.engine == "core":
+        if args.shared_engine:
+            runtime = Path(original_runtime) / "autocorrect"
+            with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as connection:
+                connection.settimeout(2)
+                connection.connect(str(runtime / "engine.sock"))
+                connection.send(b'{"op":"status"}')
+                shared = json.loads(connection.recv(16384))
+            if shared.get("state", {}).get("protocol_version") != 1:
+                raise RuntimeError("Il motore condiviso non supporta il pannello. Riavvia autocorrect.service.")
+            config_home = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+            env["AUTOCORRECT_PROBE_ENGINE_SOCKET"] = str(runtime / "engine.sock")
+            env["AUTOCORRECT_PROBE_DIAGNOSTICS"] = str(runtime / "decision.json")
+            env["AUTOCORRECT_PROBE_SETTINGS"] = str(config_home / "autocorrect/settings.json")
+            env["AUTOCORRECT_PROBE_SHARED_ENGINE"] = "1"
+            env["AUTOCORRECT_PROBE_INITIAL_FREQUENCY"] = str(shared["state"]["settings"]["min_frequency"])
+            if shared["state"]["capabilities"]["context"]:
+                env["AUTOCORRECT_PROBE_CONTEXT_CORPUS"] = "shared"
+            if shared["state"]["capabilities"]["learning"]:
+                env["AUTOCORRECT_PROBE_LEARNING"] = "1"
+                env["AUTOCORRECT_PROBE_FEEDBACK"] = str(runtime / "feedback.json")
+            print("Collegato al motore del pannello Omarchy.", flush=True)
+        elif args.engine == "core":
             socket_path = session / "runtime/e.sock"
             ready = session / "core-ready.json"
             diagnostics = session / "decision.json"

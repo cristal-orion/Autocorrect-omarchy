@@ -43,20 +43,23 @@ def feedback_word(value):
 class FeedbackMemory:
     """No learned counts are cached: another session/forget is visible immediately."""
 
-    def __init__(self, path):
+    def __init__(self, path, *, read_only=False):
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError:
-            pass
+        if read_only:
+            self.db = sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True, timeout=.02)
         else:
-            os.close(fd)
-        self.db = sqlite3.connect(self.path, timeout=.02)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            except FileExistsError:
+                pass
+            else:
+                os.close(fd)
+            self.db = sqlite3.connect(self.path, timeout=.02)
         try:
             tables = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             version = self.db.execute("PRAGMA user_version").fetchone()[0]
-            if not tables and version == 0:
+            if not tables and version == 0 and not read_only:
                 with self.db:
                     self.db.execute("CREATE TABLE feedback_events (id TEXT PRIMARY KEY, kind TEXT NOT NULL, "
                                     "original TEXT NOT NULL, target TEXT NOT NULL, c1 TEXT NOT NULL, c2 TEXT NOT NULL, "
@@ -69,7 +72,8 @@ class FeedbackMemory:
                     self.db.execute("PRAGMA user_version=1")
             elif tables != {"feedback_events", "feedback_receipts"} or version != 1:
                 raise ValueError("Il file esistente non è una memoria feedback supportata.")
-            self.db.execute("PRAGMA journal_mode=WAL")
+            if not read_only:
+                self.db.execute("PRAGMA journal_mode=WAL")
         except BaseException:
             self.db.close()
             raise

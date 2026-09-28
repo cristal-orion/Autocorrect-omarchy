@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""Use the project's verified environment from the installed shell plugin."""
+import json
+import os
+from pathlib import Path
+import sys
+
+try:
+    config = json.loads(Path(__file__).with_name("backend.json").read_text())
+    os.environ["AUTOCORRECT_PROJECT_ROOT"] = config["project"]
+    os.chdir(config["project"])
+    os.execv(config["python"], [config["python"], "-m", "autocorrect_core.control", *sys.argv[1:]])
+except (OSError, ValueError, KeyError) as error:
+    print(json.dumps({"ok": False, "error": f"Controller non disponibile: {error}. Reinstalla il pannello."}))
+    raise SystemExit(1)

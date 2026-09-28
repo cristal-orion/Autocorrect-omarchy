@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "michele.autocorrect",
+  "name": "Autocorrect",
+  "version": "0.1.0",
+  "author": "Michele",
+  "description": "Controlli del correttore italiano, contesto e memoria personale.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {"barWidget": "Panel.qml"},
+  "barWidget": {
+    "displayName": "Autocorrect",
+    "category": "Input",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

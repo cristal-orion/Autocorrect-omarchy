@@ -4,6 +4,10 @@ Aggiornamento: 28 settembre 2026.
 Cartella: `/home/michele/Projects/autocorrect`.
 Repository: https://github.com/cristal-orion/Autocorrect-omarchy
 
+**Sessione in pausa su richiesta dell'utente.** Il pannello Omarchy è in corso;
+il widget incompleto è disabilitato e il nuovo servizio è inattivo. Punto di
+ripresa e verifiche mancanti: [OMARCHY_PANEL_WIP.md](OMARCHY_PANEL_WIP.md).
+
 ## Punto centrale emerso dalla prova manuale
 
 **A frequenza minima 5.000 l'utente riferisce che quasi tutto funziona bene.

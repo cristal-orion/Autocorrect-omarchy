@@ -2,7 +2,7 @@
 
 import argparse
 from contextlib import ExitStack
-from dataclasses import asdict, replace
+from dataclasses import asdict, dataclass, replace
 import json
 import os
 from pathlib import Path
@@ -13,14 +13,58 @@ import sqlite3
 import time
 
 from .cli import add_engine_arguments, load_engine
-from .engine import CONTEXTS
+from .engine import CONTEXTS, Decision
+from .settings import read_patch, validate_patch, write_settings
 
 
 PACKET_LIMIT = 4096
 TRAILING_PUNCTUATION = re.compile(r"([^\W\d_]+)([,.!?;:]+)", re.UNICODE)
 
 
-def decide(engine, request: bytes, contextual=None, learner=None) -> dict:
+@dataclass
+class RuntimeControls:
+    correction_enabled: bool = True
+
+
+def settings_snapshot(engine, contextual=None, learner=None, runtime=None):
+    return {"correction_enabled": runtime.correction_enabled if runtime else True,
+            "min_score_margin": engine.policy.min_score_margin, "min_frequency": engine.policy.min_frequency,
+            "use_context": bool(contextual and contextual.enabled), "learn_enabled": bool(learner and learner.enabled),
+            "suggestions_enabled": bool(learner and learner.suggestions_enabled)}
+
+
+def control_snapshot(engine, contextual=None, learner=None, runtime=None):
+    return {"protocol_version": 1, "pid": os.getpid(),
+            "settings": settings_snapshot(engine, contextual, learner, runtime),
+            "capabilities": {"context": contextual is not None, "learning": learner is not None}}
+
+
+def validate_available(payload, contextual=None, learner=None, runtime=None):
+    payload = validate_patch(payload)
+    if payload.get("use_context") and contextual is None:
+        raise ValueError("Questa istanza non ha un modello contestuale.")
+    if (payload.get("learn_enabled") or payload.get("suggestions_enabled")) and learner is None:
+        raise ValueError("Questa istanza non ha la memoria personale.")
+    if "correction_enabled" in payload and runtime is None:
+        raise ValueError("Questa istanza non supporta la pausa globale.")
+    return payload
+
+
+def apply_settings(engine, payload, contextual=None, learner=None, runtime=None):
+    overrides = {key: payload[key] for key in ("min_score_margin", "min_frequency") if key in payload}
+    engine.policy = replace(engine.policy, **overrides)
+    if contextual is not None and "use_context" in payload:
+        contextual.enabled = payload["use_context"]
+    if learner is not None:
+        if "learn_enabled" in payload:
+            learner.enabled = payload["learn_enabled"]
+        if "suggestions_enabled" in payload:
+            learner.suggestions_enabled = payload["suggestions_enabled"]
+    if runtime is not None and "correction_enabled" in payload:
+        runtime.correction_enabled = payload["correction_enabled"]
+
+
+def decide(engine, request: bytes, contextual=None, learner=None, runtime=None) -> dict:
     payload = json.loads(request)
     if not isinstance(payload, dict) or not isinstance(payload.get("token"), str):
         raise ValueError("Atteso un token testuale.")
@@ -38,12 +82,15 @@ def decide(engine, request: bytes, contextual=None, learner=None) -> dict:
     match = TRAILING_PUNCTUATION.fullmatch(token)
     word, suffix = (match[1], match[2]) if match else (token, "")
     context_info = {"enabled": False, "used": False}
-    if contextual is None:
+    paused = runtime is not None and not runtime.correction_enabled
+    if paused:
+        decision = Decision(word, word, "keep", "paused")
+    elif contextual is None:
         decision = engine.evaluate(word, context=field_context)
     else:
         decision, context_info = contextual.evaluate(word, previous, context=field_context)
     personal_info = {"enabled": False, "used": False}
-    if learner is not None:
+    if learner is not None and not paused:
         decision, personal_info = learner.apply(word, previous, decision, context=field_context)
     required_margin = context_info["required_margin"] if context_info["used"] else engine.policy.min_score_margin
     if personal_info["used"]:
@@ -56,28 +103,41 @@ def decide(engine, request: bytes, contextual=None, learner=None) -> dict:
             "baseline_required_margin": engine.policy.min_score_margin,
             "required_frequency": engine.policy.min_frequency, "context": context_info, "personal": personal_info,
             "blocked_context": field_context != "text",
-            "suggestions_enabled": bool(learner and learner.suggestions_enabled and field_context == "text"),
+            "suggestions_enabled": bool(not paused and learner and learner.suggestions_enabled and field_context == "text"),
             "candidate_outputs": [c.term + suffix for c in decision.candidates[:3]] if decision.action == "keep" else []}
 
 
-def handle_request(engine, request, contextual=None, learner=None):
+def handle_request(engine, request, contextual=None, learner=None, runtime=None, settings=None):
     payload = json.loads(request)
     if not isinstance(payload, dict):
         raise ValueError("Richiesta non valida.")
     operation = payload.get("op", "decide")
     if operation == "decide":
-        return decide(engine, request, contextual, learner)
-    if learner is None:
-        return {"feedback": {"status": "learning_unavailable"}}
-    if operation == "feedback":
-        return {"feedback": learner.feedback(payload)}
+        return decide(engine, request, contextual, learner, runtime)
     if payload.get("context", "text") != "text":
         return {"feedback": {"status": "ignored_context"}}
     if operation == "status":
         token = payload.get("token")
         if token is not None and (not isinstance(token, str) or len(token) > 128):
             raise ValueError("Input di stato non valido.")
-        return {"memory": learner.memory.status(token)}
+        return {"memory": learner.memory.status(token) if learner else None,
+                "state": control_snapshot(engine, contextual, learner, runtime)}
+    if operation == "configure":
+        if settings is None:
+            raise ValueError("Impostazioni non modificabili in questa istanza.")
+        patch = validate_available(payload.get("changes"), contextual, learner, runtime)
+        if settings.exists():
+            read_patch(settings)  # Do not overwrite an unfamiliar/malformed file.
+        updated = {**settings_snapshot(engine, contextual, learner, runtime), **patch}
+        write_settings(settings, updated)
+        apply_settings(engine, updated, contextual, learner, runtime)
+        return {"configured": True, "state": control_snapshot(engine, contextual, learner, runtime)}
+    if learner is None:
+        return {"feedback": {"status": "learning_unavailable"}}
+    if operation == "feedback":
+        if runtime is not None and not runtime.correction_enabled:
+            return {"feedback": {"status": "ignored_paused"}}
+        return {"feedback": learner.feedback(payload)}
     if operation == "forget":
         from .feedback import feedback_word
         original = feedback_word(payload.get("token"))
@@ -89,45 +149,13 @@ def handle_request(engine, request, contextual=None, learner=None):
     raise ValueError("Operazione non riconosciuta.")
 
 
-def refresh_policy(engine, settings: Path | None, contextual=None, learner=None) -> bool:
+def refresh_policy(engine, settings: Path | None, contextual=None, learner=None, runtime=None) -> bool:
     """Apply a session-local override; malformed writes retain the last policy."""
     if settings is None:
         return False
     try:
-        with settings.open("rb") as source:
-            raw = source.read(1025)
-        if len(raw) > 1024:
-            return False
-        payload = json.loads(raw)
-        if (not isinstance(payload, dict) or not payload
-                or not set(payload) <= {"min_score_margin", "min_frequency", "use_context", "learn_enabled", "suggestions_enabled"}):
-            return False
-        overrides = {}
-        if "min_score_margin" in payload:
-            value = payload["min_score_margin"]
-            if type(value) not in (int, float) or not 0.01 <= value <= 5.0:
-                return False
-            overrides["min_score_margin"] = float(value)
-        if "min_frequency" in payload:
-            value = payload["min_frequency"]
-            if type(value) is not int or not 1000 <= value <= 100000:
-                return False
-            overrides["min_frequency"] = value
-        if "use_context" in payload:
-            if type(payload["use_context"]) is not bool or (payload["use_context"] and contextual is None):
-                return False
-        for name in ("learn_enabled", "suggestions_enabled"):
-            if name in payload and (type(payload[name]) is not bool or (payload[name] and learner is None)):
-                return False
-        # Validate the entire snapshot before applying either setting.
-        engine.policy = replace(engine.policy, **overrides)
-        if contextual is not None and "use_context" in payload:
-            contextual.enabled = payload["use_context"]
-        if learner is not None:
-            if "learn_enabled" in payload:
-                learner.enabled = payload["learn_enabled"]
-            if "suggestions_enabled" in payload:
-                learner.suggestions_enabled = payload["suggestions_enabled"]
+        payload = validate_available(read_patch(settings), contextual, learner, runtime)
+        apply_settings(engine, payload, contextual, learner, runtime)
         return True
     except (OSError, ValueError):
         return False
@@ -141,6 +169,7 @@ def serve(engine, path: Path, ready: Path, diagnostics: Path | None = None,
     if path.exists() or path.is_symlink():
         raise ValueError("Il socket esiste già.")
     running = True
+    runtime = RuntimeControls()
 
     def stop(signum, frame):
         nonlocal running
@@ -154,7 +183,7 @@ def serve(engine, path: Path, ready: Path, diagnostics: Path | None = None,
         try:
             server.listen(4)
             server.settimeout(.2)
-            refresh_policy(engine, settings, contextual, learner)
+            refresh_policy(engine, settings, contextual, learner, runtime)
             ready.write_text(json.dumps({"dictionary_sha256": engine.dictionary_sha256,
                                         "policy": asdict(engine.policy),
                                         "context_model": contextual.model.metadata if contextual else None,
@@ -173,8 +202,8 @@ def serve(engine, path: Path, ready: Path, diagnostics: Path | None = None,
                         packet, _, flags, _ = client.recvmsg(PACKET_LIMIT)
                         if flags & socket.MSG_TRUNC:
                             raise ValueError("Pacchetto troppo grande.")
-                        refresh_policy(engine, settings, contextual, learner)
-                        response = handle_request(engine, packet, contextual, learner)
+                        refresh_policy(engine, settings, contextual, learner, runtime)
+                        response = handle_request(engine, packet, contextual, learner, runtime, settings)
                     except (ValueError, OSError, sqlite3.Error):
                         response = {"action": "keep", "reason": "invalid_request", "feedback": {"status": "error"}}
                     try:
