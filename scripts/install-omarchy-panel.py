@@ -114,7 +114,7 @@ def install(project, home, *, enable=True):
         subprocess.run(["omarchy-shell", "shell", "rescanPlugins"], check=True)
         subprocess.run(["omarchy", "plugin", "enable", PLUGIN_ID], check=True)
     return {"plugin": str(plugin), "service": str(unit), "backup": str(backup), "settings": str(settings),
-            "autostart": "not changed", "desktop_integration": "not installed"}
+            "autostart": "not changed", "desktop_integration": "managed separately by install-browseros-probe.py"}
 
 
 def main():

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="it">
+<meta charset="utf-8">
+<title>Autocorrect — prova BrowserOS</title>
+<style>
+  body { max-width: 760px; margin: 40px auto; padding: 0 24px; font: 18px/1.5 system-ui; color-scheme: light dark; }
+  textarea, input, [contenteditable] { display: block; box-sizing: border-box; width: 100%; padding: 12px; font: inherit; margin: 8px 0 24px; border: 1px solid #888; }
+  textarea { min-height: 150px; }
+  [contenteditable] { min-height: 80px; }
+  code { font-size: .9em; }
+</style>
+<h1>Prova Autocorrect in BrowserOS</h1>
+<p>Scrivi <code>quesot</code> e premi <strong>Spazio</strong>: dovrebbe diventare
+<code>questo</code>. Premi subito <strong>Backspace</strong> per annullare.</p>
+<p>Prova anche <code>una piza </code> e <code>sono stao </code>, incluso lo spazio finale.</p>
+<p>Con <strong>Suggerimenti</strong> attivo nel pannello Omarchy, scrivi
+<code>domnai </code>: quando il motore propone alternative senza correggere,
+scegli con <strong>Alt+1</strong>, <strong>Alt+2</strong> o <strong>Alt+3</strong>.
+Backspace annulla anche una scelta. F1 resta il comando del browser.</p>
+<label for="normal">Testo normale</label>
+<textarea id="normal" autofocus spellcheck="true" autocomplete="off"></textarea>
+<label for="rich">Editor rich text</label>
+<div id="rich" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true"></div>
+<label for="password">Campo password di prova: qui il testo deve restare invariato</label>
+<input id="password" type="password" autocomplete="off">
+<label for="code">Correzione esclusa (spellcheck=false)</label>
+<textarea id="code" spellcheck="false"></textarea>
+<p>Questa pagina è locale: non invia il testo a un server. Il motore e la memoria
+del correttore funzionano sul computer.</p>
+</html>

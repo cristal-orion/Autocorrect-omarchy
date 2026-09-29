@@ -87,6 +87,9 @@ UI.Panel {
         function inspect(): string {
             return JSON.stringify({opened: root.opened, connected: root.online, busy: root.busy,
                 settings: root.snapshot.settings, error: root.errorText,
+                button: {text: button.text, width: button.width, height: button.height,
+                    visible: button.visible, opacity: button.opacity,
+                    x: button.mapToItem(null, 0, 0).x, y: button.mapToItem(null, 0, 0).y},
                 geometry: {x: panel.cardOrigin.x, y: panel.cardOrigin.y, width: panel.contentWidth,
                     height: panel.contentHeight, screen: panel.screen ? panel.screen.name : ""}})
         }
@@ -105,13 +108,17 @@ UI.Panel {
         }
     }
 
-    UI.BarIconButton {
+    UI.WidgetButton {
         id: button
         anchors.fill: parent
         bar: root.bar
-        text: "󰓆"
+        text: "AC"
+        useActiveColor: false
+        dimmed: root.loaded && (!root.online || !root.snapshot.settings.correction_enabled)
         active: root.loaded && root.online && root.snapshot.settings.correction_enabled
-        tooltipText: "Autocorrect · " + (root.online ? "motore di prova pronto" : "motore non collegato")
+        tooltipText: "Autocorrect · " + (root.online ? "motore pronto" : "motore non collegato")
+        Accessible.name: "Apri pannello Autocorrect"
+        Accessible.role: Accessible.Button
         onPressed: function(mouseButton) { root.toggle() }
     }
 
@@ -160,7 +167,7 @@ UI.Panel {
                         Layout.fillWidth: true
                         textFormat: Text.PlainText
                         text: root.busy ? "Operazione in corso…" : (root.pollFailed ? "Stato non aggiornato" : (!root.loaded ? "Lettura dello stato…" :
-                            root.online ? "Motore pronto · ambito: prova Fcitx" : (root.snapshot.service.active === "active" ? "Motore non raggiungibile" : "Motore spento")))
+                            root.online ? (root.snapshot.desktop_trial ? "Motore pronto · prova BrowserOS" : "Motore pronto · ambito: prova Fcitx") : (root.snapshot.service.active === "active" ? "Motore non raggiungibile" : "Motore spento")))
                         color: Color.foreground
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
@@ -212,7 +219,8 @@ UI.Panel {
                     }
                     ControlRow {
                         Layout.fillWidth: true
-                        label: "Suggerimenti"; helper: "Solo sulle astensioni"
+                        label: "Suggerimenti"
+                        helper: root.snapshot.desktop_trial ? "Scelta: Alt+1 / Alt+2 / Alt+3" : "Solo sulle astensioni · F1 / F2 / F3"
                         checked: !!root.snapshot.settings.suggestions_enabled
                         available: root.online && !!root.snapshot.capabilities.learning; busy: root.busy
                         onRequested: value => root.setOption("suggestions_enabled", value)
@@ -309,7 +317,9 @@ UI.Panel {
                     UI.PanelSeparator { Layout.fillWidth: true }
                     Text {
                         Layout.fillWidth: true
-                        text: "App da collaudare: BrowserOS, ZapFast, Slack.\nTerminale: solo chat, attivazione manuale da verificare.\nIl motore non è ancora collegato al Fcitx di sistema."
+                        text: root.snapshot.desktop_trial
+                            ? "BrowserOS: collegamento di prova installato.\nSlack e ZapFast: da collegare. Terminale escluso.\nCorrezioni solo nei campi che consentono il controllo ortografico."
+                            : "App da collaudare: BrowserOS, ZapFast, Slack.\nTerminale: solo chat, attivazione manuale da verificare.\nIl motore non è ancora collegato al Fcitx di sistema."
                         color: Color.foreground
                         font.family: Style.font.family
                         font.pixelSize: Style.font.caption

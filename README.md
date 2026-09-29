@@ -7,6 +7,18 @@ decisione esplicita: correggere oppure conservare l'input.
 Stato corrente, risultati della prova manuale e prossime priorità:
 [docs/STATUS.md](docs/STATUS.md).
 
+### Prova nel BrowserOS reale
+
+Sulla macchina predisposta, `.venv/bin/python scripts/run-browseros-probe.py`
+apre BrowserOS con una pagina locale e il correttore collegato al Fcitx desktop.
+Digitare `quesot` e Spazio; Backspace annulla. La prova è limitata a BrowserOS.
+Installazione, verifiche e limiti: [docs/BROWSEROS_PROBE.md](docs/BROWSEROS_PROBE.md).
+
+Il profilo BrowserOS quotidiano è ora collegato con attivazione automatica e
+adattamento dei campi web: correzione e undo verificati su Google Ricerca,
+Gemini, ChatGPT e Google Traduttore. La guida descrive anche il componente
+browser necessario e la sua attivazione persistente.
+
 ### Prova attuale con apprendimento personale
 
 ```sh

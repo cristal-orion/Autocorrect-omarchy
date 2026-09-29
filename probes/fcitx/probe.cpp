@@ -74,6 +74,15 @@ private:
 };
 
 bool blocked(fcitx::InputContext *ic) {
+    // Desktop trials opt in one application at a time. Unknown application
+    // identities stay excluded; isolated toolkit probes leave this unset.
+    if (const char *program = std::getenv("AUTOCORRECT_PROBE_ALLOWED_PROGRAM")) {
+        if (!*program || ic->program() != program) return true;
+        // Wayland exposes spellcheck as a positive hint, not NoSpellCheck.
+        // Require it in the desktop trial so code/editors opting out stay intact.
+        if (ic->frontendName() == "wayland_v2" &&
+            !ic->capabilityFlags().test(fcitx::CapabilityFlag::SpellCheck)) return true;
+    }
     auto flags = ic->capabilityFlags();
     return flags.testAny(fcitx::CapabilityFlags(fcitx::CapabilityFlag::PasswordOrSensitive) |
                          fcitx::CapabilityFlag::Terminal |
@@ -89,6 +98,16 @@ bool surroundingUsable(fcitx::InputContext *ic) {
            text.isValid() && text.cursor() == text.anchor();
 }
 
+std::vector<fcitx::Key> selectionKeys(fcitx::InputContext *ic) {
+    const auto *program = std::getenv("AUTOCORRECT_PROBE_ALLOWED_PROGRAM");
+    if (program && *program && ic->program() == program) {
+        return {fcitx::Key(FcitxKey_1, fcitx::KeyState::Alt),
+                fcitx::Key(FcitxKey_2, fcitx::KeyState::Alt),
+                fcitx::Key(FcitxKey_3, fcitx::KeyState::Alt)};
+    }
+    return {fcitx::Key(FcitxKey_F1), fcitx::Key(FcitxKey_F2), fcitx::Key(FcitxKey_F3)};
+}
+
 std::size_t cursorByte(fcitx::InputContext *ic) {
     return fcitx::utf8::ncharByteLength(ic->surroundingText().text().begin(),
                                       ic->surroundingText().cursor());
@@ -100,6 +119,9 @@ void diagnostic(fcitx::InputContext *ic, const char *event) {
               << " frontend=" << ic->frontend()
               << " preedit=" << ic->capabilityFlags().test(fcitx::CapabilityFlag::Preedit)
               << " surrounding=" << surroundingUsable(ic)
+              << " valid=" << ic->surroundingText().isValid()
+              << " cursor=" << ic->surroundingText().cursor()
+              << " anchor=" << ic->surroundingText().anchor()
               << " blocked=" << blocked(ic) << '\n';
 }
 } // namespace
@@ -112,6 +134,7 @@ public:
             fcitx::EventType::InputContextSurroundingTextUpdated,
             fcitx::EventWatcherPhase::PostInputMethod, [this](fcitx::Event &event) {
                 auto *ic = static_cast<fcitx::InputContextEvent &>(event).inputContext();
+                acknowledgeWayland(ic);
                 auto *state = ic->propertyFor(&factory_);
                 if (blocked(ic) || !ic->hasFocus()) { *state = State{}; return; }
                 if (surroundingUsable(ic)) {
@@ -139,10 +162,27 @@ public:
                     diagnostic(ic, "undo-snapshot-received");
                 }
             });
+        cursorWatcher_ = instance_->watchEvent(fcitx::EventType::InputContextCursorRectChanged,
+            fcitx::EventWatcherPhase::PostInputMethod, [this](fcitx::Event &event) {
+                acknowledgeWayland(static_cast<fcitx::InputContextEvent &>(event).inputContext());
+            });
+        focusWatcher_ = instance_->watchEvent(fcitx::EventType::InputContextFocusIn,
+            fcitx::EventWatcherPhase::PostInputMethod, [this](fcitx::Event &event) {
+                auto *ic = static_cast<fcitx::InputContextEvent &>(event).inputContext();
+                const auto *program = std::getenv("AUTOCORRECT_PROBE_ALLOWED_PROGRAM");
+                if (std::getenv("AUTOCORRECT_PROBE_AUTO_ACTIVATE") && program && *program
+                    && ic->program() == program && ic->frontendName() == "wayland_v2"
+                    && ic->hasFocus() && instance_->inputMethod(ic) != "autocorrect-probe-surrounding") {
+                    // Change only this application context, not the group or
+                    // the user's keyboard state in terminals and other apps.
+                    instance_->setCurrentInputMethod(ic, "autocorrect-probe-surrounding", true);
+                }
+            });
     }
 
     void activate(const fcitx::InputMethodEntry &, fcitx::InputContextEvent &event) override {
         diagnostic(event.inputContext(), "activate");
+        acknowledgeWayland(event.inputContext());
     }
 
     void reset(const fcitx::InputMethodEntry &, fcitx::InputContextEvent &event) override {
@@ -199,8 +239,9 @@ public:
         if (!preedit) {
             confirmSelection(ic, state, true);
             if (surroundingUsable(ic)) observeEdit(ic, state);
+            const auto choices = selectionKeys(ic);
             for (int i = 0; i < 3; ++i) {
-                if (key.check(static_cast<fcitx::KeySym>(FcitxKey_F1 + i)) && selectChoice(ic, state, i)) {
+                if (key.check(choices[i]) && selectChoice(ic, state, i)) {
                     event.filterAndAccept();
                     return;
                 }
@@ -318,6 +359,19 @@ public:
     }
 
 private:
+    void acknowledgeWayland(fcitx::InputContext *ic) {
+        // Fcitx 5.1.22 suppresses repeated empty preedits. Chromium's v3 IME
+        // waits for a done before sending more surrounding state. An empty
+        // commit acknowledges the serial without inserting any text. Keep this
+        // compatibility path confined to the opt-in desktop surrounding trial.
+        const auto *program = std::getenv("AUTOCORRECT_PROBE_ALLOWED_PROGRAM");
+        if (std::getenv("AUTOCORRECT_PROBE_WAYLAND_ACK") && program && *program
+            && ic->program() == program && ic->frontendName() == "wayland_v2" && ic->hasFocus()
+            && instance_->inputMethod(ic) == "autocorrect-probe-surrounding") {
+            ic->commitString("");
+        }
+    }
+
     void observeEdit(fcitx::InputContext *ic, State *state) {
         const bool active = state->edit.active;
         auto observation = state->edit.observe(ic->surroundingText().text(), cursorByte(ic), cursorByte(ic));
@@ -428,7 +482,7 @@ private:
                 state->choiceCursor = ic->surroundingText().cursor() + 1;
                 state->choiceReady = false;
                 auto list = std::make_unique<fcitx::CommonCandidateList>();
-                list->setSelectionKey({fcitx::Key(FcitxKey_F1), fcitx::Key(FcitxKey_F2), fcitx::Key(FcitxKey_F3)});
+                list->setSelectionKey(selectionKeys(ic));
                 for (size_t i = 0; i < state->choices.size(); ++i) {
                     list->append<FeedbackCandidate>(state->choices[i], [this, i](fcitx::InputContext *context) {
                         selectChoice(context, context->propertyFor(&factory_), i);
@@ -470,6 +524,8 @@ private:
     fcitx::Instance *instance_;
     fcitx::SimpleInputContextPropertyFactory<State> factory_;
     std::unique_ptr<fcitx::HandlerTableEntry<fcitx::EventHandler>> surroundingWatcher_;
+    std::unique_ptr<fcitx::HandlerTableEntry<fcitx::EventHandler>> cursorWatcher_;
+    std::unique_ptr<fcitx::HandlerTableEntry<fcitx::EventHandler>> focusWatcher_;
 };
 
 class ProbeFactory : public fcitx::AddonFactory {

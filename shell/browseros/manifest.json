@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Autocorrect — campi di scrittura",
+  "version": "0.1.0",
+  "description": "Comunica al metodo di input i campi di testo compatibili. Le correzioni restano nel motore locale Fcitx.",
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["ime-fields.js"],
+    "run_at": "document_idle",
+    "all_frames": true
+  }]
+}

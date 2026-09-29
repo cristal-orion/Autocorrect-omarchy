@@ -82,6 +82,16 @@ class Controller:
 
     def status(self):
         engine = self.engine_state()
+        desktop_trial = None
+        marker = self.paths.settings.with_name("desktop-install.json")
+        try:
+            installed = json.loads(marker.read_text())
+            files = installed.get("files", {})
+            if (installed.get("allowed_program") == "BrowserOS" and files
+                    and all(Path(path).is_file() for path in files)):
+                desktop_trial = {"allowed_program": "BrowserOS", "method": "autocorrect-probe-surrounding"}
+        except (OSError, ValueError, AttributeError, TypeError):
+            pass
         values = engine["state"]["settings"] if engine else load_settings(self.paths.settings)
         memory = engine.get("memory") if engine else None
         memory_error = ""
@@ -95,7 +105,8 @@ class Controller:
             memory = {"confirmations": 0, "rejections": 0, "pair_count": 0}
         return {"ok": True, "connected": engine is not None, "service": self.service_state(),
                 "settings": values, "memory": memory, "memory_error": memory_error,
-                "scope": "laboratory", "desktop_integration": False,
+                "scope": "browseros_trial" if desktop_trial else "laboratory",
+                "desktop_integration": desktop_trial is not None, "desktop_trial": desktop_trial,
                 "apps": ["BrowserOS", "ZapFast", "Slack"], "terminal_mode": "manual_chat_pending",
                 "capabilities": engine["state"]["capabilities"] if engine else {},
                 "paths": {"memory": str(self.paths.memory), "settings": str(self.paths.settings)}}

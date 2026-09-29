@@ -116,6 +116,20 @@ class ControlTest(unittest.TestCase):
             worker.join(timeout=2)
             self.assertFalse(worker.is_alive())
 
+    def test_desktop_status_reports_only_an_installed_trial(self):
+        paths = ControlPaths(self.root, self.settings, self.root / "unused.sqlite3", self.root / "runtime", self.root / "unit")
+        controller = Controller(paths)
+        marker = self.settings.with_name("desktop-install.json")
+        library = self.root / "addon.so"
+        marker.write_text(json.dumps({"allowed_program": "BrowserOS", "files": {str(library): "digest"}}))
+        with patch.object(controller, "service_state", return_value={}), patch.object(controller, "engine_state", return_value=None):
+            self.assertFalse(controller.status()["desktop_integration"])
+            library.touch()
+            self.assertEqual(controller.status()["desktop_trial"]["allowed_program"], "BrowserOS")
+            self.assertEqual(controller.status()["scope"], "browseros_trial")
+            marker.write_text("invalid")
+            self.assertIsNone(controller.status()["desktop_trial"])
+
 
 class PanelInstallTest(unittest.TestCase):
     def test_install_preserves_configuration_and_refuses_user_modified_files(self):

@@ -1,12 +1,33 @@
 # Autocorrect Omarchy: stato del progetto
 
-Aggiornamento: 28 settembre 2026.
+Aggiornamento: 29 settembre 2026.
 Cartella: `/home/michele/Projects/autocorrect`.
 Repository: https://github.com/cristal-orion/Autocorrect-omarchy
 
-**Sessione in pausa su richiesta dell'utente.** Il pannello Omarchy è in corso;
-il widget incompleto è disabilitato e il nuovo servizio è inattivo. Punto di
-ripresa e verifiche mancanti: [OMARCHY_PANEL_WIP.md](OMARCHY_PANEL_WIP.md).
+**Sessione ripresa: pannello Omarchy collegato al motore.** Il widget si apre;
+il servizio era spento ed è stato avviato. Plugin abilitato, servizio attivo,
+avvio al login abilitato. Il pannello ora mostra l'ambito della prova
+BrowserOS. **143 test Python superati**, incluso lo stato desktop.
+Regressioni: **62 controlli Qt e 15 GTK** passati.
+Cronologia del pannello:
+[OMARCHY_PANEL_WIP.md](OMARCHY_PANEL_WIP.md).
+
+**BrowserOS quotidiano collegato:** addon Fcitx limitato all'app ID BrowserOS,
+attivazione automatica al focus e piccolo componente browser per i campi web.
+Correzione e undo verificati anche su **Google Ricerca, Gemini, ChatGPT e
+Google Traduttore** nel profilo quotidiano. **25 controlli** sul laboratorio
+browser e sulle app escluse, più **2 controlli dopo riapertura**. Risolti il
+controllo ortografico disabilitato nel profilo e i campi con indicazioni IME
+assenti o disabilitate. Suggerimenti attivati:
+**Alt+1/2/3** selezionano i candidati, F1 resta al browser; verificata anche
+la regressione dei 35 controlli Qt di apprendimento. Slack, ZapFast e terminale
+sono ancora esclusi. Avvio, limiti e accorgimento di sincronizzazione per
+Fcitx 5.1.22: [BROWSEROS_PROBE.md](BROWSEROS_PROBE.md).
+
+**Conferma manuale finale:** dopo la configurazione del profilo aggiuntivo,
+l'utente conferma il funzionamento su Claude e riferisce che funziona anche
+su Chrome nei campi provati. I test automatici riguardano BrowserOS.
+Riepilogo della sessione: [SESSION_2026-09-29.md](SESSION_2026-09-29.md).
 
 ## Punto centrale emerso dalla prova manuale
 
