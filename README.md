@@ -33,6 +33,12 @@ sospende la memoria; Alt+D permette di dimenticare un typo. I suggerimenti
 selezionabili sono opzionali (Alt+S), disabilitati all'avvio.
 Regole, file della memoria e verifiche: [docs/LEARNING.md](docs/LEARNING.md).
 
+### Parole attaccate e apostrofo (sperimentale)
+
+`nonlo → non lo`, `allinizio → all'inizio`, `cè → c'è`, con Backspace per
+annullare. Si attiva con `--segmentation` nel server e nel launcher Fcitx.
+Regole, corpus colloquiale e misure: [docs/SEGMENTATION.md](docs/SEGMENTATION.md).
+
 ## Avvio rapido
 
 Richiede Python 3.10+ con `venv` e accesso a Internet per il setup iniziale:

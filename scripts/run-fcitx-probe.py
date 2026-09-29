@@ -55,7 +55,7 @@ def status(path, client):
             for name in ("normal", "password", "code", "second")}
 
 
-def exercise(app, status_path, client, env, mode, popup=False, core=None, contextual=False):
+def exercise(app, status_path, client, env, mode, popup=False, core=None, contextual=False, segmentation=False):
     clients = lambda: json.loads(command(["hyprctl", "-j", "clients"]))
     window = wait_for(lambda: next((item for item in clients() if item["pid"] == app.pid), None))
     target = "address:" + window["address"]
@@ -77,9 +77,21 @@ def exercise(app, status_path, client, env, mode, popup=False, core=None, contex
             if character.isupper():
                 key(character.lower(), "SHIFT")
             else:
-                key({" ": "space", "è": "egrave", ".": "period", "\n": "Return"}.get(character, character))
+                key({" ": "space", "è": "egrave", ".": "period", ",": "comma", "'": "apostrophe",
+                     "\n": "Return"}.get(character, character))
 
     results = []
+    # Leipzig-only evidence (no generated corpus): these outcomes stay fixed.
+    segmentation_cases = (
+        ("segmentation_splits_joined_words", "nonlo ", "non lo "),
+        ("segmentation_restores_apostrophe", "allinizio ", "all'inizio "),
+        ("segmentation_short_elision_with_accent", "cè ", "c'è "),
+        ("segmentation_keeps_trailing_punctuation", "vabene, ", "va bene, "),
+        ("segmentation_ambiguous_reading_preserved", "lagente ", "lagente "),
+        ("segmentation_preserves_capitalization", "Lacqua ", "Lacqua "),
+        ("segmentation_accent_confusion_preserved", "nè ", "nè "),
+        ("segmentation_known_word_preserved", "apposto ", "apposto "),
+    )
 
     def check(name, field, expected):
         try:
@@ -168,6 +180,16 @@ def exercise(app, status_path, client, env, mode, popup=False, core=None, contex
         key("BackSpace")
         key("space")
         check("gtk_three_letter_undo", "normal", "prosciutto nel pne ")
+        if segmentation:
+            for name, value, expected in segmentation_cases[:3]:
+                clear()
+                text(value)
+                check("gtk_" + name, "normal", expected)
+            clear()
+            text("nonlo ")
+            key("BackSpace")
+            key("space")
+            check("gtk_segmentation_undo_then_space", "normal", "nonlo ")
     if core is not None and client == "qt":
         key("Tab")
         key("Tab")
@@ -340,6 +362,18 @@ def exercise(app, status_path, client, env, mode, popup=False, core=None, contex
                 clear()
                 text(value)
                 check(name, "paragraph", expected)
+            if segmentation:
+                for name, value, expected in segmentation_cases:
+                    clear()
+                    text(value)
+                    check(name, "paragraph", expected)
+                clear()
+                text("ci vediamo allinizio ")
+                key("BackSpace")
+                key("space")
+                check("segmentation_undo_then_space", "paragraph", "ci vediamo allinizio ")
+                text("e nonlo ")
+                check("segmentation_after_undo_continues", "paragraph", "ci vediamo allinizio e non lo ")
             key("c", "ALT")
             wait_for(lambda: not status(status_path, client)["context"]["enabled"])
             key("t", "ALT")
@@ -617,6 +651,10 @@ def main():
                         help="fixed: tre sostituzioni; core: SymSpell + Hunspell persistenti")
     parser.add_argument("--context", action="store_true", help="Abilita il contesto Leipzig sperimentale nel core")
     parser.add_argument("--frequency", type=int, default=100000, help="Frequenza iniziale della sessione core, da 1000 a 100000")
+    parser.add_argument("--segmentation", action="store_true",
+                        help="Stacca parole attaccate e rimette l'apostrofo; richiede --context")
+    parser.add_argument("--colloquial", action="store_true",
+                        help="Aggiunge il corpus colloquiale preparato alla separazione (non con --test)")
     parser.add_argument("--learn", action="store_true", help="Apprende gesti espliciti nella memoria personale persistente")
     parser.add_argument("--memory", type=Path, help="Memoria feedback alternativa; --test usa una memoria nuova nella sessione")
     parser.add_argument("--candidates", action="store_true", help="Suggerimenti selezionabili opzionali, solo nelle astensioni; richiede --learn")
@@ -628,9 +666,12 @@ def main():
         parser.error("Il motore reale si prova con --mode surrounding, senza --popup.")
     if (args.learn and args.engine != "core") or ((args.memory or args.candidates) and not args.learn):
         parser.error("L'apprendimento richiede --engine core; memoria e candidati richiedono --learn.")
+    if (args.segmentation and not args.context) or (args.colloquial and (not args.segmentation or args.test)):
+        parser.error("--segmentation richiede --context; --colloquial richiede --segmentation e non vale con --test.")
     if args.test and args.memory:
         parser.error("Il test usa una memoria isolata e non accetta --memory.")
-    if args.shared_engine and (args.engine != "core" or args.test or args.memory or args.learn or args.context or args.candidates or args.frequency != 100000):
+    if args.shared_engine and (args.engine != "core" or args.test or args.memory or args.learn or args.context
+                               or args.segmentation or args.candidates or args.frequency != 100000):
         parser.error("--shared-engine richiede --engine core e usa le impostazioni del pannello; non accetta test o override locali.")
     binary = ROOT / "build/fcitx-probe" / f"autocorrect-probe-{args.client}"
     library = ROOT / "build/fcitx-probe/libautocorrectprobe.so"
@@ -724,6 +765,10 @@ def main():
                 corpus = ROOT / "benchmark-data/leipzig-ita-news-2023-100k"
                 context_args = ["--context-corpus", str(corpus)]
                 env["AUTOCORRECT_PROBE_CONTEXT_CORPUS"] = str(corpus)
+                if args.segmentation:
+                    context_args.append("--segmentation")
+                if args.colloquial:
+                    context_args += ["--colloquial-corpus", str(ROOT / "benchmark-data/colloquial-it-llm/prepared")]
             learning_args = []
             if args.learn:
                 memory = session / "feedback.sqlite3" if args.test else (args.memory or
@@ -762,10 +807,12 @@ def main():
         children.append(app)
         if args.test:
             report = (exercise_learning(app, status_path, args.client, env, core, children) if args.learn else
-                      exercise(app, status_path, args.client, env, args.mode, args.popup, core, args.context))
+                      exercise(app, status_path, args.client, env, args.mode, args.popup, core, args.context,
+                               args.segmentation))
             report["popup_requested"] = args.popup
             report["engine"] = args.engine
             report["context_requested"] = args.context
+            report["segmentation_requested"] = args.segmentation
             report["learning_requested"] = args.learn
             (session / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
             print(json.dumps(report, indent=2, ensure_ascii=False))

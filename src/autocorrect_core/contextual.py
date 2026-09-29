@@ -92,6 +92,15 @@ class TrainingNgrams:
             raise ValueError("Conteggi del corpus non validi.")
         return values, sum(values.values())
 
+    def count(self, context, word):
+        """One primary-key lookup, for callers that need a single surface form."""
+        c1, c2 = (("", "") + tuple(context))[-2:]
+        found = self.connection.execute("SELECT count FROM ngrams WHERE n=? AND c1=? AND c2=? AND word=?",
+                                        (len(context) + 1, c1, c2, word)).fetchone()
+        if found is not None and (type(found[0]) is not int or found[0] <= 0):
+            raise ValueError("Conteggi del corpus non validi.")
+        return found[0] if found else 0
+
     def close(self):
         self.row.cache_clear()
         self.article_row.cache_clear()

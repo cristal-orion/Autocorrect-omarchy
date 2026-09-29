@@ -47,6 +47,19 @@ dei parametri ha usato esempi e risultati di sviluppo, non valutazione indipende
 
 ## Aggiornamenti successivi al riepilogo iniziale
 
+- **Parole attaccate e apostrofo (29 settembre, pomeriggio):**
+  - **Cosa fa:** `nonlo → non lo`, `allinizio → all'inizio`, `cè → c'è`. Si
+    astiene su letture vicine (`lagente`) e sulle confusioni d'accento (`nè`).
+  - **Evidenza:** conteggi Leipzig più un corpus colloquiale generato
+    dall'utente, filtrato con Hunspell e tenuto separato.
+  - **Sviluppo:** 25.838 unioni giuste e 2 sbagliate; 978 elisioni giuste e
+    nessuna sbagliata; 6 typo a parola singola rubati su 6.352.
+  - **Test:** 161 test Python.
+  - **Prove Qt/GTK con `--segmentation`:** 72 controlli Qt e 19 GTK superati.
+  - **Regressione dell'apprendimento:** 35 controlli Qt e 35 GTK superati.
+  - **Desktop:** non ancora installato.
+  - **Dettagli:** [SEGMENTATION.md](SEGMENTATION.md).
+
 - **Apprendimento personale nel bridge Fcitx:** avvio con `--learn`, memoria
   locale persistente in `~/.local/share/autocorrect/feedback.sqlite3` (rispetta
   XDG_DATA_HOME). Impara da modifiche manuali alla stessa parola e scelte esplicite;

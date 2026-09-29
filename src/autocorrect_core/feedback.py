@@ -14,11 +14,13 @@ from symspellpy.editdistance import DistanceAlgorithm, EditDistance
 
 from .engine import CONTEXTS, Decision, latin_word, normalize
 from .prediction import scan_text
+from .segmentation import segmented_parts
 
 
 POSITIVE_KINDS = ("manual", "selection")
 DISTANCE = EditDistance(DistanceAlgorithm.DAMERAU_OSA)
-TRAILING = re.compile(r"([^\W\d_]+)([,.!?;:]+)", re.UNICODE)
+# Also "per piacere," and "l'acqua.": two-part readings keep their punctuation.
+TRAILING = re.compile(r"([^\W\d_]+(?:[ '][^\W\d_]+)?)([,.!?;:]+)", re.UNICODE)
 
 
 def default_feedback_memory():
@@ -164,6 +166,13 @@ class FeedbackLearner:
         return (word in self.engine.symspell.words or word in self.engine.protected
                 or self.engine.word_validator.spell(word))
 
+    def recognized_target(self, target):
+        """A destination may be a split (per piacere) or an elided form (l'acqua)."""
+        if " " in target:
+            parts = segmented_parts(target)
+            return parts is not None and all(self.recognized(part) for part in parts)
+        return self.recognized(target)
+
     def feedback(self, payload):
         context = payload.get("context", "text")
         if context not in CONTEXTS:
@@ -185,10 +194,10 @@ class FeedbackLearner:
         original = feedback_word(payload.get("original"))
         target = feedback_word(payload.get("target"))
         ctx = history(payload.get("previous", ""))
-        if (not latin_word(original) or not latin_word(target) or max(len(original), len(target)) > 64
-                or original == target):
+        if (not latin_word(original) or not (latin_word(target) or segmented_parts(target))
+                or max(len(original), len(target)) > 64 or original == target):
             return {"status": "ignored_edit"}
-        if not self.recognized(target):
+        if not self.recognized_target(target):
             return {"status": "ignored_unknown_target"}
         distance = DISTANCE.compare(original, target, 2)
         pair = (len(original) >= 3 and payload["original"] == payload["original"].lower()
@@ -214,7 +223,7 @@ class FeedbackLearner:
         # ranking, or recognized only through Hunspell.
         for target in sorted(pairs.keys() | uses.keys()):
             distance = DISTANCE.compare(word, target, 2)
-            if target not in candidates and 1 <= distance <= 2 and self.recognized(target):
+            if target not in candidates and 1 <= distance <= 2 and self.recognized_target(target):
                 candidates[target] = PersonalCandidate(target, distance, self.engine.symspell.words.get(target, 0), None)
         order = {term: index for index, term in enumerate(candidates)}
         ranked = [PersonalCandidate(item.term, item.distance, item.frequency, item.score,

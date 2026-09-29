@@ -19,10 +19,13 @@ START = "<s>"
 END = "</s>"
 PUNCTUATION = ',.:;!?()[]{}"«»“”'
 WORD = re.compile(r"[^\W\d_]+(?:'[^\W\d_]+)*", re.UNICODE)
+# Apocopes written with a final apostrophe. Other trailing apostrophes stay
+# closing quotes, so they keep interrupting the sequence.
+TRUNCATIONS = frozenset(("po'", "mo'", "be'", "va'", "fa'", "di'", "da'", "sta'"))
 
 
 def is_word(token: str) -> bool:
-    return bool(WORD.fullmatch(token)) and latin_word(token.replace("'", ""))
+    return (token in TRUNCATIONS or bool(WORD.fullmatch(token))) and latin_word(token.replace("'", ""))
 
 
 def scan_text(text: str) -> tuple[list[list[str]], list[str]]:

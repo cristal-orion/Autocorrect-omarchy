@@ -24,8 +24,13 @@ inline void jsonString(json_object *object, const char *key, const std::string &
     json_object_object_add(object, key, json_object_new_string_len(value.data(), value.size()));
 }
 
+// A replacement is one word or a two-word split ("per piacere"): at most one
+// inner space, never at an edge, and no other whitespace.
 inline bool safeProbeOutput(const std::string &value) {
-    return !value.empty() && value.size() <= 512 && value.find_first_of("\r\n\t ") == std::string::npos
+    const auto space = value.find(' ');
+    return !value.empty() && value.size() <= 512 && value.find_first_of("\r\n\t") == std::string::npos
+        && (space == std::string::npos || (space > 0 && space + 1 < value.size()
+                                           && value.find(' ', space + 1) == std::string::npos))
         && value.find('\0') == std::string::npos && fcitx::utf8::validate(value);
 }
 
