@@ -162,6 +162,8 @@ class PanelInstallTest(unittest.TestCase):
             self.assertTrue((home / ".local/bin/autocorrect-control").stat().st_mode & 0o111)
             self.assertIn("RuntimeDirectory=autocorrect", Path(result["service"]).read_text())
             self.assertIn(f"WorkingDirectory={project}\n", Path(result["service"]).read_text())
+            self.assertIn('"--segmentation"', Path(result["service"]).read_text())
+            self.assertNotIn("--segmentation-corpus", Path(result["service"]).read_text())
             panel = Path(result["plugin"]) / "Panel.qml"
             panel.write_text("User changes")
             with self.assertRaises(ValueError):

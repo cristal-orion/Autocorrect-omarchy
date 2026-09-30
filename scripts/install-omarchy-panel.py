@@ -16,6 +16,8 @@ from autocorrect_core.settings import DEFAULT_SETTINGS, load_settings, write_set
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_ID = "michele.autocorrect"
+# Prepared corpora for word splitting, passed to the engine when present.
+SEGMENTATION_CORPORA = ("benchmark-data/tatoeba-ita/prepared", "benchmark-data/colloquial-it-llm/prepared")
 
 
 def digest(path):
@@ -32,7 +34,10 @@ def unit_text(project, config, data):
     args = [project / ".venv/bin/python", "-B", "-m", "autocorrect_core.probe_server",
             "--settings", config / "autocorrect/settings.json", "--context-corpus",
             project / "benchmark-data/leipzig-ita-news-2023-100k", "--feedback-memory",
-            data / "autocorrect/feedback.sqlite3", "--hunspell"]
+            data / "autocorrect/feedback.sqlite3", "--hunspell", "--segmentation"]
+    for corpus in SEGMENTATION_CORPORA:
+        if (project / corpus / "manifest.json").is_file():
+            args += ["--segmentation-corpus", project / corpus]
     command = " ".join(unit_argument(arg) for arg in args)
     command += " --socket %t/autocorrect/engine.sock --ready %t/autocorrect/ready.json"
     command += " --diagnostics %t/autocorrect/decision.json --feedback-diagnostics %t/autocorrect/feedback.json"

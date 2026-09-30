@@ -57,7 +57,14 @@ dei parametri ha usato esempi e risultati di sviluppo, non valutazione indipende
     correzione. Un rifiuto pesa quanto una conferma.
   - **Verifiche:** 164 test Python; 72 controlli Qt e 19 GTK di separazione;
     43 Qt e 43 GTK di apprendimento.
-  - **Desktop:** non ancora installato.
+  - **Installato nel desktop:**
+    - `autocorrect.service` con `--segmentation`, Tatoeba e corpus colloquiale;
+    - addon Fcitx aggiornato;
+    - BrowserOS: 27 controlli superati, compresi `nonlo`, `allinizio`,
+      `perpiacere` e annullamento; più 2 sull'app esclusa.
+  - **Memoria:** azzerati i 7 rifiuti di prova di `quesot`, `domnai`, `piza` e
+    `maglioner`, con backup in `~/.local/state/autocorrect/memory-backups/`.
+  - **Parole protette:** `startup`, `trail`, `popstar`, `rockstar` e `villain`.
   - **Dettagli:** [SEGMENTATION.md](SEGMENTATION.md) e [LEARNING.md](LEARNING.md).
 
 - **Parole attaccate e apostrofo (29 settembre, pomeriggio):**

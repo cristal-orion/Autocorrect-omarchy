@@ -175,9 +175,11 @@ try {
     await check('undo', 'normal', 'quesot');
     await check('undo_not_reapplied', 'normal', 'quesot ');
     await firstSequence;
-    for (const [input, expected] of [['una piza ', 'una pizza '], ['sono stao ', 'sono stato ']]) {
+    for (const [input, expected] of [['una piza ', 'una pizza '], ['sono stao ', 'sono stato '],
+                                     ['nonlo ', 'non lo '], ['allinizio ', "all'inizio "], ['perpiacere ', 'per piacere ']]) {
       await field('normal'); await text(input); await check(`context_${input.trim()}`, 'normal', expected);
     }
+    await key('BackSpace'); await check('segmentation_undo', 'normal', 'perpiacere');
     await field('normal');
     await cdp.send('Input.insertText', { text: 'è ' });
     await sleep(200);

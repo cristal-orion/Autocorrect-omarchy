@@ -80,3 +80,9 @@ backup
 dataset
 benchmark
 typo
+# English loanwords typed lowercase that would otherwise split (start up, tra il).
+startup
+trail
+popstar
+rockstar
+villain

@@ -1,7 +1,7 @@
 # Parole attaccate e apostrofo
 
 Stato: 29 settembre 2026. Blocco sperimentale nel core e nel bridge Fcitx, verificato
-nelle finestre di prova Qt/GTK, **non ancora installato nel desktop**.
+nelle finestre di prova Qt/GTK e **installato nel desktop** (BrowserOS) il 30 settembre.
 
 Allo spazio il motore può ora staccare due parole scritte unite e rimettere
 un apostrofo mancante:
@@ -178,5 +178,6 @@ L'addon accetta ora una sostituzione con al massimo uno spazio interno
   Backspace viene ricordata.
 - **Accenti sbagliati** come `perchè` sono un problema distinto. Oggi li
   corregge il motore base solo quando il margine basta.
-- **Servizio desktop.** `autocorrect.service` non passa ancora
-  `--segmentation`: l'installazione è un passo separato, dopo le prove Qt/GTK.
+- **Servizio desktop.** `scripts/install-omarchy-panel.py` passa
+  `--segmentation` e i corpus preparati presenti. Dopo aver ricostruito un
+  corpus, riavviare `autocorrect.service`.

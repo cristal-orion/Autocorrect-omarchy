@@ -172,7 +172,8 @@ virtuale Wayland invia i tasti passando attraverso Fcitx. L'apprendimento viene
 sospeso e ripristinato per evitare feedback dei test nella memoria personale.
 Il prefisso Unicode viene inserito via CDP, poi la correzione viene digitata.
 
-**23 controlli BrowserOS e 2 controlli su app ID escluso superati**: spazio,
+**23 controlli BrowserOS e 2 controlli su app ID escluso superati** (dal 30 settembre
+27 BrowserOS, con separazione, apostrofo e relativo annullamento): spazio,
 undo, mancata riapplicazione, contesto, offset Unicode, rich text, password,
 spellcheck disabilitato e applicazione non autorizzata. Gli 11 controlli aggiunti
 verificano le tre scelte Alt+numero con annullamento, F1 inoltrato al browser e
