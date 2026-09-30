@@ -22,7 +22,7 @@ from .dictionary import default_dictionary
 from .engine import AutocorrectEngine, Policy, latin_word
 from .hunspell import HunspellValidator
 from .leipzig_corpus import digest_file
-from .segmentation import DEFAULT_COLLOQUIAL_WEIGHT, SegmentationPolicy, Segmenter, load_models
+from .segmentation import SegmentationPolicy, Segmenter, corpus_option, load_models
 
 
 # Written from the user's request and common chat habits before measuring;
@@ -103,8 +103,8 @@ def measure(segmenter, cases, base):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
-    parser.add_argument("--colloquial-corpus", type=Path)
-    parser.add_argument("--colloquial-weight", type=float, default=DEFAULT_COLLOQUIAL_WEIGHT)
+    parser.add_argument("--segmentation-corpus", type=corpus_option, action="append", default=[],
+                        metavar="CARTELLA[=PESO]", help="Corpus preparato aggiuntivo; il suo sviluppo entra nei casi")
     parser.add_argument("--token-dataset", type=Path, default=Path("benchmark-data/it-seed42/development.json"))
     parser.add_argument("--frequency", type=int, default=5000)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -117,12 +117,11 @@ def main(argv=None):
     with ExitStack() as stack:
         validator = stack.enter_context(HunspellValidator())
         engine = AutocorrectEngine(default_dictionary(), policy=Policy(min_frequency=args.frequency), word_validator=validator)
-        models = load_models(args.corpus, args.colloquial_corpus, args.colloquial_weight, stack)
+        models = load_models(args.corpus, args.segmentation_corpus, stack)
         cached = [(CachedCounts(model), weight) for model, weight in models]
         recognized = lru_cache(maxsize=None)(lambda word: word in engine.symspell.words or validator.spell(word))
         sources = [args.corpus / "development.txt"]
-        if args.colloquial_corpus is not None:
-            sources.append(args.colloquial_corpus / "development.txt")
+        sources.extend(directory / "development.txt" for directory, _ in args.segmentation_corpus)
         lines = list(development_lines(sources))
         positives, skipped = joined_cases(lines, recognized)
         valid_probes = []

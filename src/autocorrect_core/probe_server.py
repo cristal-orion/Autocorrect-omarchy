@@ -14,6 +14,7 @@ import time
 
 from .cli import add_engine_arguments, load_engine
 from .engine import CONTEXTS, Decision
+from .segmentation import corpus_option
 from .settings import read_patch, validate_patch, write_settings
 
 
@@ -245,8 +246,8 @@ def main(argv=None):
     parser.add_argument("--feedback-diagnostics", type=Path)
     parser.add_argument("--segmentation", action="store_true",
                         help="Stacca parole attaccate e rimette l'apostrofo (richiede --context-corpus e Hunspell)")
-    parser.add_argument("--colloquial-corpus", type=Path, help="Corpus colloquiale preparato, usato dalla separazione")
-    parser.add_argument("--colloquial-weight", type=float)
+    parser.add_argument("--segmentation-corpus", type=corpus_option, action="append", default=[],
+                        metavar="CARTELLA[=PESO]", help="Corpus preparato aggiuntivo per la separazione (ripetibile)")
     add_engine_arguments(parser)
     args = parser.parse_args(argv)
     try:
@@ -263,10 +264,9 @@ def main(argv=None):
                 if args.context_corpus is None:
                     raise ValueError("--segmentation richiede --context-corpus.")
                 from .segmentation import Segmenter, load_models
-                segmenter = Segmenter(engine, load_models(args.context_corpus, args.colloquial_corpus,
-                                                          args.colloquial_weight, stack))
-            elif args.colloquial_corpus is not None:
-                raise ValueError("--colloquial-corpus richiede --segmentation.")
+                segmenter = Segmenter(engine, load_models(args.context_corpus, args.segmentation_corpus, stack))
+            elif args.segmentation_corpus:
+                raise ValueError("--segmentation-corpus richiede --segmentation.")
             if args.feedback_memory is not None:
                 from .feedback import FeedbackLearner, FeedbackMemory
                 memory = stack.enter_context(FeedbackMemory(args.feedback_memory))

@@ -33,6 +33,12 @@ bool separator(char character) {
     return character == ' ' || character == '\n' || character == '\r' || character == '\t';
 }
 
+bool closingPunctuation(const fcitx::Key &key) {
+    const auto text = fcitx::Key::keySymToUTF8(key.sym());
+    return text.size() == 1 && std::string(",.;:!?").find(text[0]) != std::string::npos
+        && !key.states().testAny(fcitx::KeyStates(fcitx::KeyState::Ctrl) | fcitx::KeyState::Alt | fcitx::KeyState::Super);
+}
+
 struct State : fcitx::InputContextProperty {
     std::string composing;
     std::string original;
@@ -44,6 +50,10 @@ struct State : fcitx::InputContextProperty {
     bool suppressNextSpace = false;
     EditTracker edit;
     std::string undoPrevious, undoFeedbackId;
+    // After an undo, the rejection is only learned if the user keeps the
+    // original with Space; editing, typing or punctuation discard it.
+    bool rejectPending = false;
+    std::string rejectOriginal, rejectTarget, rejectPrevious, rejectUndoOf;
     std::string pendingFeedbackId, pendingOriginal, pendingTarget, pendingPrevious;
     std::string choiceText, choiceBeforeText, choiceOriginal, choicePrevious;
     unsigned choiceCursor = 0;
@@ -111,6 +121,15 @@ std::vector<fcitx::Key> selectionKeys(fcitx::InputContext *ic) {
 std::size_t cursorByte(fcitx::InputContext *ic) {
     return fcitx::utf8::ncharByteLength(ic->surroundingText().text().begin(),
                                       ic->surroundingText().cursor());
+}
+
+// The restored original still sits whole right before the caret.
+bool originalBeforeCursor(fcitx::InputContext *ic, const std::string &original) {
+    if (original.empty() || !surroundingUsable(ic)) return false;
+    const auto &text = ic->surroundingText().text();
+    const auto byte = cursorByte(ic);
+    return byte >= original.size() && text.compare(byte - original.size(), original.size(), original) == 0
+        && (byte == original.size() || separator(text[byte - original.size() - 1]));
 }
 
 void diagnostic(fcitx::InputContext *ic, const char *event) {
@@ -248,13 +267,35 @@ public:
             }
             clearChoices(ic, state);
         }
+        if (!preedit && state->rejectPending && !key.check(FcitxKey_space)) {
+            state->rejectPending = false;
+            // Backspace removed the space to add punctuation: put the
+            // correction back and let the punctuation key through.
+            if (closingPunctuation(key) && originalBeforeCursor(ic, state->rejectOriginal)) {
+                const auto count = fcitx::utf8::length(state->rejectOriginal);
+                ic->deleteSurroundingText(-static_cast<int>(count), count);
+                ic->commitString(state->rejectTarget);
+                state->suppressNextSpace = false;
+                state->edit.clear();
+                diagnostic(ic, "undo-reverted-for-punctuation");
+                return; // The punctuation key itself reaches the application.
+            }
+        }
         if (key.check(FcitxKey_BackSpace) && !state->original.empty()) {
             if (!state->waitingForSurrounding && surroundingUsable(ic) && ic->surroundingText().text() == state->expectedText &&
                 ic->surroundingText().cursor() == state->expectedCursor) {
                 const auto original = state->original;
                 auto target = state->replacement;
                 if (!target.empty() && target.back() == ' ') target.pop_back();
-                sendFeedback(feedbackId(), "reject", original, target, state->undoPrevious, state->undoFeedbackId);
+                if (preedit) {
+                    sendFeedback(feedbackId(), "reject", original, target, state->undoPrevious, state->undoFeedbackId);
+                } else {
+                    state->rejectPending = true;
+                    state->rejectOriginal = original;
+                    state->rejectTarget = target;
+                    state->rejectPrevious = state->undoPrevious;
+                    state->rejectUndoOf = state->undoFeedbackId;
+                }
                 const auto count = fcitx::utf8::length(state->replacement);
                 state->edit.clear();
                 state->clearUndo();
@@ -302,6 +343,12 @@ public:
             if (key.check(FcitxKey_space)) {
                 if (state->suppressNextSpace) {
                     state->suppressNextSpace = false;
+                    if (state->rejectPending && originalBeforeCursor(ic, state->rejectOriginal)) {
+                        sendFeedback(feedbackId(), "reject", state->rejectOriginal, state->rejectTarget,
+                                     state->rejectPrevious, state->rejectUndoOf);
+                        diagnostic(ic, "undo-kept");
+                    }
+                    state->rejectPending = false;
                     return;
                 }
                 replaceSurrounding(ic, state, event);

@@ -54,6 +54,26 @@ gli n-grammi del solo training. Il repository versiona il programma originale;
 testi e dati derivati rimangono fuori da Git. Comandi, limitazioni dello split e
 metadati: [docs/LEIPZIG_CORPUS.md](docs/LEIPZIG_CORPUS.md).
 
+## Frasi italiane Tatoeba
+
+- Editore: **Tatoeba**, <https://tatoeba.org>, frasi scritte da volontari.
+- Download: <https://downloads.tatoeba.org/exports/per_language/ita/ita_sentences.tsv.bz2>.
+- Licenza: **CC BY 2.0 FR**, <https://creativecommons.org/licenses/by/2.0/fr/>.
+  Condizioni: <https://tatoeba.org/en/downloads>.
+- Esportazione del 26 settembre 2026 (intestazione `Last-Modified`), scaricata il 29:
+  SHA-256 `55c220482848cb9402c94e53750902744301fb700ca0cce5a938c8fd13644ca2`,
+  9570218 byte. L'esportazione cambia ogni settimana, quindi il manifest
+  registra il file effettivamente usato.
+
+L'importatore `src/autocorrect_core/tatoeba_corpus.py`:
+- scarta le frasi con parole sconosciute a lessico e Hunspell, tranne i nomi
+  scritti con la maiuscola;
+- normalizza e deduplica;
+- divide per hash e conta gli n-grammi del solo training.
+
+Frasi e conteggi derivati restano fuori da Git. Per distribuirli occorre
+citare Tatoeba, indicare la licenza e segnalare le modifiche.
+
 ## LatinIME: selezione del codice per la prossima prova
 
 Fonte preferita: **Android Open Source Project**,

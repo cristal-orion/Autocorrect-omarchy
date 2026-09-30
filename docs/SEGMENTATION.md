@@ -12,10 +12,11 @@ un apostrofo mancante:
 | `vabene,` | `va bene,` | punteggiatura finale conservata |
 | `allinizio` | `all'inizio` | `segmentation_elision` |
 | `cè`, `lho`, `dovè` | `c'è`, `l'ho`, `dov'è` | elisione breve |
-| `lagente` | `lagente` | `la gente` e `l'agente` troppo vicini |
+| `delloro`, `unartista` | invariati | `del loro`/`dell'oro`, `un artista`/`un'artista` troppo vicini |
 | `nè` | `nè` | più probabile `né` sbagliato che `n'è` |
 | `Lacqua` | `Lacqua` | maiuscola: possibile nome |
-| `perpiacere` | `perpiacere` | poca evidenza, finché il corpus colloquiale non cresce |
+| `perpiacere`, `cisentiamo` | `per piacere`, `ci sentiamo` | evidenza da Tatoeba |
+| `lagente` | `la gente` | 792 occorrenze contro 40 per `l'agente` |
 
 Backspace subito dopo annulla anche queste sostituzioni. L'annullamento viene
 registrato dalla memoria personale come per le altre correzioni.
@@ -35,8 +36,9 @@ Codice: `src/autocorrect_core/segmentation.py`.
      accettano la forma: `l'acqua` e `l'ho` sì, `un'altro` no.
 3. **Evidenza.** È il numero di volte in cui la forma esatta compare nei
    conteggi di training: il bigramma `non → lo` per le separazioni, la forma
-   `l'acqua` per le elisioni. Si sommano Leipzig (peso 1) e, se caricato, il
-   corpus colloquiale (peso regolabile, predefinito 1).
+   `l'acqua` per le elisioni. Si sommano Leipzig (peso 1) e i corpus preparati
+   passati con `--segmentation-corpus CARTELLA[=PESO]` (peso predefinito 1):
+   Tatoeba e le frasi generate.
 4. **Concorrenza con le correzioni normali.** Le correzioni a una lettera
    (`trada → strada`) competono sulla stessa scala, con una penalità
    `log10` di 1 per ogni lettera modificata. Così una separazione non ruba un
@@ -50,40 +52,64 @@ Codice: `src/autocorrect_core/segmentation.py`.
 
 ## Misure di sviluppo
 
-Comando, dati e report:
-
 ```sh
 .venv/bin/python -m autocorrect_core.segmentation_benchmark \
-  --colloquial-corpus benchmark-data/colloquial-it-llm/prepared \
+  --segmentation-corpus benchmark-data/tatoeba-ita/prepared \
+  --segmentation-corpus benchmark-data/colloquial-it-llm/prepared \
   --output-dir benchmark-results/NUOVA-CARTELLA
 ```
 
-Riferimento: `benchmark-results/segmentation-development-v3/report.json`,
-con frequenza 5.000, Hunspell e 423 frasi colloquiali. La griglia prova
-rapporto 2/5/20, penalità 0/1/2 ed evidenza 2/3. Con la configurazione
-predefinita:
+Riferimento: `benchmark-results/segmentation-development-v5-tatoeba/report.json`.
+Condizioni: frequenza 5.000, Hunspell, Leipzig + Tatoeba + 423 frasi generate,
+tutti con peso 1. Le unioni vengono dalle frasi di sviluppo di tutti e tre i
+corpus. Con la configurazione predefinita:
 
 | Gruppo | Casi | Cambi giusti | Cambi sbagliati |
 |---|---:|---:|---:|
-| Unioni di parole adiacenti | 102.528 | 25.838 | 2 |
-| Elisioni senza apostrofo | 1.934 | 978 | 0 |
-| Esempi scritti a mano | 20 | 17 | 0 |
-| Parole sconosciute reali (controllo) | 4.783 | — | 22 |
+| Unioni di parole adiacenti | 223.372 | 83.292 | 2 |
+| Elisioni senza apostrofo | 3.069 | 1.762 | 3 |
+| Esempi scritti a mano | 20 | 19 | 0 |
+| Parole sconosciute reali (controllo) | 5.528 | — | 41 |
 | Parole valide manuali (controllo) | 88 | — | 0 |
-| Typo sintetici a parola singola | 6.352 | — | 6 |
+| Typo sintetici a parola singola | 6.352 | — | 5 |
 
-- **Parole sconosciute.** Molti dei 22 cambi sono veri errori del testo di
-  notizie (`lasorella`, `cheha`, `suointervento`). Sono falsi positivi reali
-  `startup`, `trail`, `aldi` e `perin`. Nomi come `sanpaolo` compaiono in
-  minuscolo solo perché il corpus è normalizzato: scritti con la maiuscola
-  restano protetti.
-- **Typo rubati.** Sono 6: `stampail`, `viail`, `farela`, `frale`, `londa` e
-  `ildi`. Per esempio `londa` diventa `l'onda` invece di `londra`.
-- **p95 del solo passo di separazione** sotto 0,1 ms, con i conteggi in
-  memoria del benchmark. Senza cache resta sotto 0,5 ms negli esempi CLI.
+**Prima di Tatoeba** (`segmentation-development-v3`): 25.838 unioni giuste
+su 102.528 casi, 978 elisioni, 17 esempi su 20.
+
+- **Parole sconosciute.** I 41 cambi mescolano due casi diversi.
+  - *Veri errori del testo*, dove la separazione ha ragione: `lasorella`,
+    `cheha`, `stocomprando`, `dettoieri`.
+  - *Falsi positivi reali*: `startup`, `trail`, `popstar`, `rockstar`,
+    `villain`, `soleil`, `mason`.
+  - Nomi come `sanpaolo` o `miami` compaiono in minuscolo solo per la
+    normalizzazione del corpus: scritti con la maiuscola restano protetti.
+- **Elisioni sbagliate:** `lasia → la sia` (atteso `l'asia`), `liva` e
+  `unoculista`.
+- **Typo rubati:** `stampail`, `viail`, `farela`, `londa` e `ildi`.
+- **Parti di una lettera:** solo `a`, `e`, `è`, `i` e `o` possono stare da
+  sole. `lab` non diventa più `la b`.
+- **p95 del solo passo di separazione:** sotto 0,1 ms, con i conteggi in cache.
 
 **Questi numeri non misurano la digitazione reale.** Le unioni sono
 artificiali: due parole adiacenti delle frasi di sviluppo, scritte insieme.
+
+## Tatoeba
+
+Circa 988.000 frasi italiane brevi scritte da volontari, CC BY 2.0 FR
+(attribuzione in `THIRD_PARTY.md`). È parlato più che chat. `per piacere`
+compare in 3.165 frasi, contro 0 nelle notizie Leipzig.
+
+```sh
+.venv/bin/python -m autocorrect_core.tatoeba_corpus
+```
+
+- **Download.** La prima esecuzione scarica
+  `benchmark-data/tatoeba-ita/ita_sentences.tsv.bz2`; le successive lo
+  riusano.
+- **Filtro.** Scarta le frasi con parole sconosciute, ma tollera i nomi scritti
+  con la maiuscola (`Tom`, `l'Australia`).
+- **Risultato del 29 settembre.** 979.382 frasi accettate e 740.015 segmenti
+  di training, in circa 7 minuti.
 
 ## Corpus colloquiale
 
@@ -97,7 +123,7 @@ settembre.
 .venv/bin/python -m autocorrect_core.colloquial_corpus
 ```
 
-L'importatore (`src/autocorrect_core/colloquial_corpus.py`):
+L'importatore (`src/autocorrect_core/colloquial_corpus.py`, parti comuni in `prepared_corpus.py`):
 
 - scarta intestazioni, recinti di codice, elenchi e ogni riga con una parola
   sconosciuta a lessico e Hunspell;
@@ -132,10 +158,9 @@ a 5.000. Con `--frequency 5000` la prova Qt si blocca per timeout.
 - **19 controlli GTK**, compresi 4 sulla separazione.
 - **Regressione dell'apprendimento:** 35 controlli Qt e 35 GTK.
 
-Per la prova manuale: `--context --frequency 5000 --segmentation`, con
-`--colloquial` facoltativo.
+Per la prova manuale: `--context --frequency 5000 --segmentation --extra-corpora`.
 
-`--colloquial` aggiunge il corpus colloquiale nelle prove manuali. Le prove
+`--extra-corpora` aggiunge Tatoeba e il corpus colloquiale, se preparati. Le prove
 `--test` usano solo Leipzig, così gli esiti attesi non cambiano mentre il
 corpus cresce.
 

@@ -89,12 +89,28 @@ class FeedbackTest(unittest.TestCase):
         self.learner.feedback(self.event("quesot", "questo", kind="reject"))
         self.assertEqual(self.query("quesot")["reason"], "personal_rejected")
 
+    def test_rejection_weighs_like_a_confirmation(self):
+        # Four explicit corrections and two kept undos: the pair still applies.
+        for _ in range(4):
+            self.learner.feedback(self.event("quesot", "questo"))
+        for _ in range(2):
+            self.learner.feedback(self.event("quesot", "questo", kind="reject"))
+        self.assertEqual(self.memory.pairs("quesot")["questo"]["net"], 2)
+        self.assertEqual(self.query("quesot")["output"], "questo")
+        # An even score no longer vetoes the general engine's own correction.
+        for _ in range(2):
+            self.learner.feedback(self.event("quesot", "questo", kind="reject"))
+        result = self.query("quesot")
+        self.assertEqual((result["output"], result["reason"]), ("questo", "high_margin"))
+        self.learner.feedback(self.event("quesot", "questo", kind="reject"))
+        self.assertEqual(self.query("quesot")["reason"], "personal_rejected")
+
     def test_undo_selection_reverses_its_positive_use(self):
         selection = self.event(kind="selection")
         self.learner.feedback(selection)
         self.learner.feedback(self.event(kind="reject", undo_of=selection["id"]))
         self.assertEqual(self.memory.uses(("con", "il")), {})
-        self.assertEqual(self.memory.pairs("pne")["pane"], {"confirmations": 0, "rejections": 1, "net": -2})
+        self.assertEqual(self.memory.pairs("pne")["pane"], {"confirmations": 0, "rejections": 1, "net": -1})
         self.assertEqual(self.learner.feedback(self.event(kind="reject", undo_of=selection["id"]))["status"], "ignored_already_undone")
         self.assertEqual(self.memory.pairs("pne")["pane"]["rejections"], 1)
 

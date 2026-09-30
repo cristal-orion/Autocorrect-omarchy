@@ -18,6 +18,10 @@ from .segmentation import segmented_parts
 
 
 POSITIVE_KINDS = ("manual", "selection")
+# A rejection is an undo the user then kept with Space; it weighs as much as a
+# confirmation. Backspace is common while writing, so one undo must not
+# outweigh earlier explicit corrections.
+REJECTION_WEIGHT = 1
 DISTANCE = EditDistance(DistanceAlgorithm.DAMERAU_OSA)
 # Also "per piacere," and "l'acqua.": two-part readings keep their punctuation.
 TRAILING = re.compile(r"([^\W\d_]+(?:[ '][^\W\d_]+)?)([,.!?;:]+)", re.UNICODE)
@@ -108,7 +112,7 @@ class FeedbackMemory:
         rows = self.db.execute(
             "SELECT target,SUM(kind IN ('manual','selection')),SUM(kind='reject') FROM feedback_events "
             "WHERE original=? AND pair_eligible=1 AND active=1 GROUP BY target", (original,))
-        return {target: {"confirmations": positive, "rejections": negative, "net": positive - 2 * negative}
+        return {target: {"confirmations": positive, "rejections": negative, "net": positive - REJECTION_WEIGHT * negative}
                 for target, positive, negative in rows}
 
     def uses(self, ctx):
@@ -229,7 +233,7 @@ class FeedbackLearner:
         ranked = [PersonalCandidate(item.term, item.distance, item.frequency, item.score,
                     pairs.get(item.term, {}).get("confirmations", 0), pairs.get(item.term, {}).get("rejections", 0),
                     uses.get(item.term, 0)) for item in candidates.values()]
-        ranked.sort(key=lambda item: (-(item.confirmations - 2 * item.rejections), -item.context_uses, order[item.term]))
+        ranked.sort(key=lambda item: (-(item.confirmations - REJECTION_WEIGHT * item.rejections), -item.context_uses, order[item.term]))
         available = [(value["net"], target) for target, value in pairs.items() if target in candidates and value["net"] > 0]
         available.sort(reverse=True)
         reason, output = decision.reason, decision.output
@@ -237,11 +241,12 @@ class FeedbackLearner:
             output, reason = available[0][1], "personal_correction"
         elif available:
             output, reason = token, "personal_ambiguous"
-        elif decision.action == "correct" and pairs.get(normalize(decision.output), {}).get("rejections", 0):
+        elif decision.action == "correct" and pairs.get(normalize(decision.output), {}).get("net", 0) < 0:
+            # Only a net majority of rejections vetoes the general engine.
             output, reason = token, "personal_rejected"
         elif decision.action == "correct":
             return decision, info
-        elif any(value["rejections"] for value in pairs.values()):
+        elif any(value["net"] < 0 for value in pairs.values()):
             output, reason = token, "personal_rejected"
         elif any(item.context_uses or item.confirmations or item.rejections for item in ranked):
             reason = "personal_suggestion"

@@ -436,7 +436,8 @@ def exercise_learning(app, status_path, client, env, core, children):
 
     def text(value):
         for char in value:
-            key({" ": "space", ".": "period", "è": "egrave"}.get(char.lower(), char.lower()), "SHIFT" if char.isupper() else "")
+            key({" ": "space", ".": "period", ",": "comma", "è": "egrave"}.get(char.lower(), char.lower()),
+                "SHIFT" if char.isupper() else "")
 
     def clear():
         key("a", "CTRL")
@@ -552,6 +553,36 @@ def exercise_learning(app, status_path, client, env, core, children):
     text("ancora pne ")
     check_text("rejected_pair_stops_autocorrecting", "ancora pne ")
 
+    # Backspace is also used to fix punctuation or keep editing: those undos
+    # are not rejections. Punctuation right after the undo keeps the correction.
+    clear()
+    text("quesot ")
+    check_text("base_correction_before_punctuation", "questo ")
+    key("BackSpace")
+    text(",")
+    check_text("undo_then_punctuation_keeps_correction", "questo,")
+    check("punctuation_after_undo_is_not_rejection",
+          lambda: memory("quesot")["pairs"].get("questo", {}).get("rejections", 0) == 0 or None)
+    clear()
+    text("quesot ")
+    key("BackSpace")
+    key("BackSpace")
+    check_text("editing_after_undo_continues", "queso")
+    text("tto ")
+    check("editing_after_undo_is_not_rejection",
+          lambda: memory("quesot")["pairs"].get("questo", {}).get("rejections", 0) == 0 or None)
+    clear()
+    text("quesot ")
+    key("BackSpace")
+    key("space")
+    check_text("undo_kept_with_space", "quesot ")
+    check("undo_kept_with_space_is_rejection",
+          lambda: memory("quesot")["pairs"].get("questo", {}).get("rejections") == 1 or None)
+    clear()
+    text("quesot ")
+    check_text("kept_undo_without_confirmations_vetoes_engine", "quesot ")
+    request({"op": "forget", "token": "quesot"})
+
     # A valid -> valid edit learns usage, never a replacement rule.
     clear()
     text("cane ")
@@ -653,8 +684,8 @@ def main():
     parser.add_argument("--frequency", type=int, default=100000, help="Frequenza iniziale della sessione core, da 1000 a 100000")
     parser.add_argument("--segmentation", action="store_true",
                         help="Stacca parole attaccate e rimette l'apostrofo; richiede --context")
-    parser.add_argument("--colloquial", action="store_true",
-                        help="Aggiunge il corpus colloquiale preparato alla separazione (non con --test)")
+    parser.add_argument("--extra-corpora", action="store_true",
+                        help="Aggiunge alla separazione i corpus preparati presenti (Tatoeba, colloquiale); non con --test")
     parser.add_argument("--learn", action="store_true", help="Apprende gesti espliciti nella memoria personale persistente")
     parser.add_argument("--memory", type=Path, help="Memoria feedback alternativa; --test usa una memoria nuova nella sessione")
     parser.add_argument("--candidates", action="store_true", help="Suggerimenti selezionabili opzionali, solo nelle astensioni; richiede --learn")
@@ -666,8 +697,8 @@ def main():
         parser.error("Il motore reale si prova con --mode surrounding, senza --popup.")
     if (args.learn and args.engine != "core") or ((args.memory or args.candidates) and not args.learn):
         parser.error("L'apprendimento richiede --engine core; memoria e candidati richiedono --learn.")
-    if (args.segmentation and not args.context) or (args.colloquial and (not args.segmentation or args.test)):
-        parser.error("--segmentation richiede --context; --colloquial richiede --segmentation e non vale con --test.")
+    if (args.segmentation and not args.context) or (args.extra_corpora and (not args.segmentation or args.test)):
+        parser.error("--segmentation richiede --context; --extra-corpora richiede --segmentation e non vale con --test.")
     if args.test and args.memory:
         parser.error("Il test usa una memoria isolata e non accetta --memory.")
     if args.shared_engine and (args.engine != "core" or args.test or args.memory or args.learn or args.context
@@ -767,8 +798,10 @@ def main():
                 env["AUTOCORRECT_PROBE_CONTEXT_CORPUS"] = str(corpus)
                 if args.segmentation:
                     context_args.append("--segmentation")
-                if args.colloquial:
-                    context_args += ["--colloquial-corpus", str(ROOT / "benchmark-data/colloquial-it-llm/prepared")]
+                if args.extra_corpora:
+                    for prepared in (ROOT / "benchmark-data/tatoeba-ita/prepared", ROOT / "benchmark-data/colloquial-it-llm/prepared"):
+                        if (prepared / "manifest.json").exists():
+                            context_args += ["--segmentation-corpus", str(prepared)]
             learning_args = []
             if args.learn:
                 memory = session / "feedback.sqlite3" if args.test else (args.memory or

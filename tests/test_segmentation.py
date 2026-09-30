@@ -1,3 +1,4 @@
+import argparse
 from contextlib import closing
 import json
 from pathlib import Path
@@ -12,7 +13,7 @@ from autocorrect_core.feedback import FeedbackLearner, FeedbackMemory
 from autocorrect_core.hunspell import DEFAULT_HUNSPELL_DICTIONARY
 from autocorrect_core.prediction import counts_for, sentences_from
 from autocorrect_core.probe_server import RuntimeControls, decide, handle_request
-from autocorrect_core.segmentation import SegmentationPolicy, Segmenter, segmented_parts
+from autocorrect_core.segmentation import SegmentationPolicy, Segmenter, corpus_option, segmented_parts
 
 
 class Validator:
@@ -104,6 +105,11 @@ class SegmentationTest(Fixture):
         self.segmenter.enabled = False
         self.assertEqual(self.run_token("lacqua")[0].output, "lacqua")
 
+    def test_one_letter_parts_must_be_words(self):
+        self.engine.symspell.create_dictionary_entry("b", 90000)
+        self.assertNotIn("la b", [c.term for c in self.run_token("lab")[0].candidates])
+        self.assertNotIn("l acqua", [c.term for c in self.run_token("lacqua")[0].candidates])
+
     def test_protected_parts_are_not_split_targets(self):
         self.engine.protected.add("lo")
         self.assertNotIn("non lo", [c.term for c in self.run_token("nonlo")[0].candidates])
@@ -113,6 +119,13 @@ class SegmentationTest(Fixture):
         self.assertEqual(segmented_parts("l'acqua"), ["l", "acqua"])
         for text in ("non lo so", " per", "per ", "l'", "a1 b", "l'acqua bene"):
             self.assertIsNone(segmented_parts(text))
+
+    def test_corpus_option_parses_directory_and_weight(self):
+        self.assertEqual(corpus_option("a/b"), (Path("a/b"), 1.0))
+        self.assertEqual(corpus_option("a/b=0.5"), (Path("a/b"), 0.5))
+        for value in ("=2", "a=0", "a=-1", "a=x", "a=nan"):
+            with self.assertRaises(argparse.ArgumentTypeError):
+                corpus_option(value)
 
     def test_policy_margin_is_a_ratio(self):
         self.assertAlmostEqual(SegmentationPolicy(min_ratio=100).margin, 2.0)

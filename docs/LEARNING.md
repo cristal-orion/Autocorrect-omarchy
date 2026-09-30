@@ -39,7 +39,8 @@ aperto con il comando sopra.
 | Alt+L | Sospende/riprende uso e raccolta della memoria nella sessione |
 | Alt+S | Abilita/disabilita i suggerimenti opzionali |
 | F1/F2/F3 o clic sul popup | Applica un candidato offerto e registra la scelta |
-| Backspace subito dopo una sostituzione | Ripristina l'originale e registra un rifiuto |
+| Backspace subito dopo una sostituzione | Ripristina l'originale; lo Spazio successivo registra un rifiuto |
+| Backspace, poi `, . ; : ! ?` | Rimette la correzione prima della punteggiatura; nessun rifiuto |
 | Alt+D, digitare il typo, Invio | Dimentica gli eventi associati a quell'input |
 
 I suggerimenti partono disabilitati. Se abilitati, il popup Fcitx compare solo
@@ -82,7 +83,7 @@ conferma. Per ora non apprendiamo passivamente tutte le frasi digitate.
 
 ### Come influisce la memoria
 
-Le coppie hanno un saldo `conferme - 2 * rifiuti`. Una prima conferma esplicita
+Le coppie hanno un saldo `conferme - rifiuti`. Una prima conferma esplicita
 può attivare la sostituzione, purché abbia saldo positivo e maggiore di ogni
 destinazione alternativa imparata per lo stesso input. In caso di parità il
 motore si astiene. Il saldo è una regola di questa versione, non una probabilità.
@@ -98,9 +99,15 @@ automatica diversa del motore generale. Il pannello mostra il motivo
 `personal_correction`, le conferme e i rifiuti; indica come baseline la soglia
 di frequenza, che non è il criterio delle coppie confermate.
 
-Annullare una correzione automatica aggiunge un rifiuto alla coppia. Annullare
-una selezione appena effettuata rimuove anche la conferma e l'uso contestuale di
-quella selezione. Un rifiuto può bloccare la stessa proposta del motore generale.
+Annullare una correzione automatica e poi premere Spazio, cioè tenere
+l'originale, aggiunge un rifiuto alla coppia. Se dopo l'annullamento si
+continua a modificare la parola, si digita una lettera o si cambia campo, non
+viene registrato niente. Backspace si usa spesso anche solo per aggiungere
+punteggiatura: in quel caso il bridge rimette la correzione prima del segno.
+
+Annullare una selezione appena effettuata rimuove anche la conferma e l'uso
+contestuale di quella selezione. I rifiuti bloccano la proposta del motore
+generale solo quando superano le conferme, cioè con saldo negativo.
 Il normale Ctrl+Z dell'editor non genera, in questa versione, un evento di rifiuto:
 per le proposte del correttore usare Backspace immediato oppure **Dimentica**.
 

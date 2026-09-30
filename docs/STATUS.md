@@ -47,6 +47,19 @@ dei parametri ha usato esempi e risultati di sviluppo, non valutazione indipende
 
 ## Aggiornamenti successivi al riepilogo iniziale
 
+- **Tatoeba e rifiuti più tolleranti (30 settembre):**
+  - **Tatoeba:** 979.382 frasi CC BY come corpus aggiuntivo della separazione.
+    `perpiacere`, `cisentiamo` e `dasolo` ora vengono separati.
+  - **Sviluppo:** 83.292 unioni giuste e 2 sbagliate; 1.762 elisioni giuste e
+    3 sbagliate; 5 typo rubati.
+  - **Rifiuti:** si impara un rifiuto solo se, dopo l'annullamento, lo Spazio
+    tiene l'originale. Backspace seguito da punteggiatura rimette la
+    correzione. Un rifiuto pesa quanto una conferma.
+  - **Verifiche:** 164 test Python; 72 controlli Qt e 19 GTK di separazione;
+    43 Qt e 43 GTK di apprendimento.
+  - **Desktop:** non ancora installato.
+  - **Dettagli:** [SEGMENTATION.md](SEGMENTATION.md) e [LEARNING.md](LEARNING.md).
+
 - **Parole attaccate e apostrofo (29 settembre, pomeriggio):**
   - **Cosa fa:** `nonlo → non lo`, `allinizio → all'inizio`, `cè → c'è`. Si
     astiene su letture vicine (`lagente`) e sulle confusioni d'accento (`nè`).

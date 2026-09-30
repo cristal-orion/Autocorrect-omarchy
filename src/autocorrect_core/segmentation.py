@@ -17,9 +17,12 @@ from .engine import Decision, Policy, latin_word, normalize
 
 
 VOWELS = "aeiouàèéìòóùh"
-# Generated chat counts relative to Leipzig news counts (weight 1).
-DEFAULT_COLLOQUIAL_WEIGHT = 1.0
+# Extra corpora (Tatoeba, generated chat) relative to Leipzig news counts (weight 1).
+DEFAULT_EXTRA_WEIGHT = 1.0
 ACCENT_SWAP = str.maketrans("èé", "éè")
+# One-letter split parts must be real words on their own ("parte a", "i due"),
+# never a stray consonant such as "la b" for lab.
+ONE_LETTER_WORDS = frozenset("aeèio")
 # Base outcomes a new reading may replace. Vetoes (known/valid/protected
 # words, case, disabled fields) and existing corrections are never revisited.
 RECOVERABLE = ("ambiguous", "short_word", "edit_distance", "low_frequency", "no_candidate", "possible_elision",
@@ -83,7 +86,8 @@ class Segmenter:
         for index in range(1, len(word)):
             left, right = word[:index], word[index:]
             if (left in self.engine.protected or right in self.engine.protected
-                    or words.get(left, 0) < minimum or words.get(right, 0) < minimum):
+                    or words.get(left, 0) < minimum or words.get(right, 0) < minimum
+                    or any(len(part) == 1 and part not in ONE_LETTER_WORDS for part in (left, right))):
                 continue
             evidence = self.surface_count((left,), right)
             found.append(SegmentCandidate(f"{left} {right}", 1, min(words[left], words[right]), 0.0, "split", evidence))
@@ -163,13 +167,25 @@ class Segmenter:
                                reason, tuple(ranked[:limit]), len(ranked), margin))
 
 
-def load_models(context_corpus, colloquial_corpus=None, colloquial_weight=None, stack=None):
-    from .colloquial_corpus import load_prepared
+def corpus_option(value):
+    """argparse type for DIR or DIR=WEIGHT."""
+    path, _, weight = value.partition("=")
+    try:
+        number = float(weight) if weight else DEFAULT_EXTRA_WEIGHT
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Peso non valido: {weight}") from None
+    if not path or not math.isfinite(number) or number <= 0:
+        raise argparse.ArgumentTypeError("Atteso CARTELLA oppure CARTELLA=PESO con peso positivo.")
+    return Path(path), number
+
+
+def load_models(context_corpus, extra=(), stack=None):
+    """Leipzig at weight 1, plus prepared corpora as [(directory, weight)]."""
     from .contextual import TrainingNgrams
-    weight = DEFAULT_COLLOQUIAL_WEIGHT if colloquial_weight is None else colloquial_weight
+    from .prepared_corpus import load_prepared
     models = [(TrainingNgrams.from_leipzig(context_corpus), 1.0)]
-    if colloquial_corpus is not None:
-        models.append((load_prepared(colloquial_corpus), weight))
+    for directory, weight in extra:
+        models.append((load_prepared(directory), weight))
     if stack is not None:
         for model, _ in models:
             stack.callback(model.close)
@@ -185,14 +201,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tokens", nargs="+")
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
-    parser.add_argument("--colloquial-corpus", type=Path)
-    parser.add_argument("--colloquial-weight", type=float)
+    parser.add_argument("--segmentation-corpus", type=corpus_option, action="append", default=[],
+                        metavar="CARTELLA[=PESO]", help="Corpus preparato aggiuntivo (Tatoeba, colloquiale)")
     parser.add_argument("--frequency", type=int, default=5000)
     args = parser.parse_args(argv)
     with ExitStack() as stack:
         validator = stack.enter_context(HunspellValidator())
         engine = AutocorrectEngine(default_dictionary(), policy=Policy(min_frequency=args.frequency), word_validator=validator)
-        segmenter = Segmenter(engine, load_models(args.corpus, args.colloquial_corpus, args.colloquial_weight, stack))
+        segmenter = Segmenter(engine, load_models(args.corpus, args.segmentation_corpus, stack))
         for token in args.tokens:
             decision, info = segmenter.evaluate(token, engine.evaluate(token))
             print(json.dumps({"decision": decision.to_dict(), "segmentation": info}, ensure_ascii=False, allow_nan=False))
